@@ -1,9 +1,17 @@
+import base64
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
-from engine.m7_article import parse_article_text, prepare_materials, validate_article
+from engine.m7_article import (
+    build_gemini_payload,
+    call_gemini,
+    parse_article_text,
+    prepare_materials,
+    validate_article,
+)
 
 GOOD = {
     "pages": [
@@ -70,3 +78,30 @@ def test_prepare_materials_no_srt(tmp_path: Path):
     out = tmp_path / "prompt.txt"
     prepare_materials(template, None, out)
     assert "无字幕" in out.read_text(encoding="utf-8")
+
+
+def test_build_gemini_payload(tmp_path: Path):
+    img = tmp_path / "grid_001.jpg"
+    img.write_bytes(b"\xff\xd8fakejpeg")
+    payload = build_gemini_payload("the prompt", [img])
+    parts = payload["contents"][0]["parts"]
+    assert parts[0] == {"text": "the prompt"}
+    assert parts[1]["inline_data"]["mime_type"] == "image/jpeg"
+    assert base64.b64decode(parts[1]["inline_data"]["data"]) == b"\xff\xd8fakejpeg"
+    assert payload["generationConfig"]["response_mime_type"] == "application/json"
+
+
+def test_call_gemini_parses_response(monkeypatch):
+    body = {
+        "candidates": [
+            {"content": {"parts": [{"text": json.dumps(GOOD)}]}}
+        ]
+    }
+
+    def fake_post(url, json=None, timeout=None):
+        assert "models/gemini-test:generateContent" in url
+        return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    data = call_gemini("prompt", [], api_key="k", model="gemini-test")
+    assert data["pages"][0]["image"] == "00_00_05"

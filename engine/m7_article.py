@@ -9,11 +9,16 @@ JSON 契约（架构文档 5.4，全项目唯一权威定义）：
 """
 from __future__ import annotations
 
+import base64
 import json
 import re
 from pathlib import Path
 
+import httpx
+
 _IMAGE_RE = re.compile(r"^\d{2}_\d{2}_\d{2}$")
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
 def validate_article(data: dict) -> list[str]:
@@ -70,3 +75,33 @@ def prepare_materials(template: Path, srt: Path | None, out: Path) -> None:
         template.read_text(encoding="utf-8").replace("{{SUBTITLES}}", subtitles),
         encoding="utf-8",
     )
+
+
+def build_gemini_payload(prompt_text: str, image_paths: list[Path]) -> dict:
+    parts: list[dict] = [{"text": prompt_text}]
+    for p in image_paths:
+        parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": base64.b64encode(p.read_bytes()).decode("ascii"),
+            }
+        })
+    return {
+        "contents": [{"parts": parts}],
+        "generationConfig": {"response_mime_type": "application/json"},
+    }
+
+
+def call_gemini(
+    prompt_text: str,
+    image_paths: list[Path],
+    api_key: str,
+    model: str = "gemini-2.5-pro",
+) -> dict:
+    """自动模式：调 Gemini API，返回已通过契约校验的 article dict。"""
+    url = GEMINI_URL.format(model=model) + f"?key={api_key}"
+    resp = httpx.post(url, json=build_gemini_payload(prompt_text, image_paths), timeout=600)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Gemini API {resp.status_code}: {resp.text[:500]}")
+    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return parse_article_text(text)
