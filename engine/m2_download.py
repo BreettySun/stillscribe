@@ -36,7 +36,8 @@ def build_download_args(
         "-f", f"bv*[height<={quality}]+ba/b[height<={quality}]",
         "--merge-output-format", "mp4",
         "--write-subs", "--write-auto-subs",
-        "--sub-langs", "en.*,en",
+        # 只要原生/自动英文轨；"en.*" 会把全部 en-XX 翻译轨拉下来（50+ 次多余请求）
+        "--sub-langs", "en,en-orig",
         "--convert-subs", "srt",
         "-o", str(dest / "%(title).80s [%(id)s].%(ext)s"),
     ]

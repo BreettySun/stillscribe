@@ -22,7 +22,7 @@ def test_build_download_args_default_1080():
     assert "bv*[height<=1080]+ba/b[height<=1080]" in joined
     assert "--merge-output-format mp4" in joined
     assert "--write-subs" in joined and "--write-auto-subs" in joined
-    assert "--sub-langs" in joined and "en" in joined
+    assert "--sub-langs en,en-orig" in joined
     assert "--convert-subs srt" in joined
     assert "--cookies-from-browser" not in joined
 
