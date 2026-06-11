@@ -1,0 +1,16 @@
+[project]
+name = "diggo-press"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "httpx>=0.28.1",
+    "imagehash>=4.3.2",
+    "pillow>=11.3.0",
+    "python-docx>=1.2.0",
+    "yt-dlp>=2025.10.14",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
