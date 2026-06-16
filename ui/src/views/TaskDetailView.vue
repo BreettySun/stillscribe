@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import type { Article } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
 import { api } from "../api/client";
+import { isDesktop, revealInFolder } from "../bridge";
 import ProgressBoard from "../components/ProgressBoard.vue";
 import GridStrip from "../components/GridStrip.vue";
 import ArticleEditor from "../components/ArticleEditor.vue";
@@ -96,7 +97,12 @@ async function onExport(): Promise<void> {
             {{ exporting ? "生成中…" : "生成 docx" }}
           </button>
           <p v-if="exportError" class="badge failed">{{ exportError }}</p>
-          <p v-if="task.outputDocx" class="mono">✅ 已生成：{{ task.outputDocx }}</p>
+          <template v-if="task.outputDocx">
+            <p class="mono">✅ 已生成：{{ task.outputDocx }}</p>
+            <button v-if="isDesktop" class="ghost" @click="revealInFolder(task.outputDocx!)">
+              在 Finder 中显示
+            </button>
+          </template>
         </section>
       </template>
     </template>

@@ -15,6 +15,7 @@ import type {
   TaskParams,
 } from "@shared/types";
 import { api } from "../api/client";
+import { notify } from "../bridge";
 
 export const useTasksStore = defineStore("tasks", () => {
   const byId = ref<Record<TaskId, Task>>({});
@@ -31,6 +32,10 @@ export const useTasksStore = defineStore("tasks", () => {
   function patch(id: TaskId, p: Partial<Task>): void {
     const cur = byId.value[id];
     if (cur) byId.value[id] = { ...cur, ...p };
+  }
+  function titleOf(id: TaskId): string {
+    const t = byId.value[id];
+    return t?.videoTitle ?? t?.params.url ?? id;
   }
 
   async function fetchAll(): Promise<void> {
@@ -57,9 +62,11 @@ export const useTasksStore = defineStore("tasks", () => {
         break;
       case "completed":
         patch(e.taskId, { status: "completed", outputDocx: e.outputDocx });
+        notify("任务完成", titleOf(e.taskId));
         break;
       case "failed":
         patch(e.taskId, { status: "failed", error: e.error });
+        notify("任务失败", `${titleOf(e.taskId)}：${e.error}`);
         break;
     }
   }

@@ -13,8 +13,9 @@ import type {
   Task,
   TaskParams,
 } from "@shared/types";
+import { engineOrigin } from "../bridge";
 
-const BASE = "/api";
+const BASE = engineOrigin;
 const JSON_HEADERS = { "content-type": "application/json" };
 
 async function parse<T>(res: Response): Promise<T> {

@@ -7,7 +7,8 @@
     "dev": "concurrently -n engine,ui -c cyan,magenta \"pnpm dev:engine\" \"pnpm dev:ui\"",
     "dev:engine": "pnpm --filter @diggo/engine dev",
     "dev:ui": "pnpm --filter @diggo/ui dev",
-    "typecheck": "pnpm --filter @diggo/engine typecheck && pnpm --filter @diggo/ui typecheck",
+    "dev:desktop": "pnpm --filter @diggo/desktop dev",
+    "typecheck": "pnpm --filter @diggo/engine typecheck && pnpm --filter @diggo/ui typecheck && pnpm --filter @diggo/desktop typecheck",
     "test": "pnpm --filter @diggo/engine test"
   },
   "devDependencies": {

@@ -1,0 +1,20 @@
+{
+  "name": "@diggo/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "视频生成图文文章工具 — Electron 套壳（P3b）",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "electron": "^33.2.1",
+    "electron-vite": "^3.1.0",
+    "typescript": "^5.7.0"
+  }
+}

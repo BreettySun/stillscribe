@@ -3,9 +3,10 @@
  * 断线自动重连由浏览器 EventSource 处理；返回 disconnect 供组件卸载时清理。
  */
 import type { EngineEvent } from "@shared/types";
+import { engineOrigin } from "../bridge";
 
 export function connectEvents(onEvent: (e: EngineEvent) => void): () => void {
-  const source = new EventSource("/api/events");
+  const source = new EventSource(`${engineOrigin}/events`);
   source.onmessage = (msg) => {
     try {
       onEvent(JSON.parse(msg.data) as EngineEvent);
