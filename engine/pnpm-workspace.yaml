@@ -1,7 +1,0 @@
-# esbuild（tsx/vitest 依赖）、sharp（M5 phash）带原生构建脚本；本环境策略要求显式批准。
-onlyBuiltDependencies:
-  - esbuild
-  - sharp
-allowBuilds:
-  esbuild: true
-  sharp: true

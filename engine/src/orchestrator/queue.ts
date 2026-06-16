@@ -1,0 +1,194 @@
+/**
+ * 编排器：串行队列 + 状态机 + 取消 + 重启恢复。
+ *
+ * 并发限流：串行（同时只跑 1 个任务），这是首版对 YouTube 的天然节流。
+ * 单批 ≤ DEFAULTS.maxBatchSize 在 server 层校验。
+ * 注：批次间最小时间间隔(minBatchIntervalMs)首版暂未强制（会让开发/测试无法连续提交）——留待后续按真实风险落参数。
+ *
+ * 状态机：queued → running → (awaiting_review | failed | canceled)
+ *         awaiting_review → running(导出 docx) → completed
+ *         failed/canceled → queued（重试）
+ * 半自动(semi)：runToGrids 完成即停在 awaiting_review，等人工回填 article 后再 exportDocx。
+ * auto 模式本版未接 Gemini，同样停在 awaiting_review（待 M7 接入）。
+ */
+import type { SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
+import { TaskDir } from "../paths.ts";
+import { runToGrids, runDocx } from "./pipeline.ts";
+import type { EventBus } from "./events.ts";
+import type { TaskStore } from "../store/tasks.ts";
+
+const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  queued: ["running", "canceled"],
+  running: ["awaiting_review", "completed", "failed", "canceled"],
+  awaiting_review: ["running", "completed", "failed", "canceled"],
+  completed: [],
+  failed: ["queued"],
+  canceled: ["queued"],
+};
+
+/** 状态迁移是否合法（纯函数，供测试与运行时校验共用）。 */
+export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
+  return TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export interface OrchestratorOptions {
+  workRoot: string;
+  /** --cookies-from-browser（可选）。 */
+  browser?: string;
+}
+
+export class Orchestrator {
+  private readonly queue: string[] = [];
+  private readonly running = new Map<string, AbortController>();
+  private active = false;
+
+  constructor(
+    private readonly store: TaskStore,
+    private readonly bus: EventBus,
+    private readonly opts: OrchestratorOptions,
+  ) {}
+
+  /** 提交单个任务，入队并触发处理。 */
+  submit(params: TaskParams): Task {
+    const task = this.store.create(params);
+    this.bus.emit({ type: "task_created", task });
+    this.queue.push(task.id);
+    this.pump();
+    return task;
+  }
+
+  /** 重启恢复：running 复位为 queued 重新入队（流水线幂等，会跳过已完成步骤）；queued 重新入队。 */
+  recover(): void {
+    for (const t of this.store.list()) {
+      if (t.status === "running") {
+        this.store.update(t.id, { status: "queued", currentStep: null });
+        this.queue.push(t.id);
+      } else if (t.status === "queued") {
+        this.queue.push(t.id);
+      }
+    }
+    this.pump();
+  }
+
+  cancel(id: string): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (task.status === "running") {
+      this.running.get(id)?.abort(); // runTask 的 catch 会落 canceled
+    } else if (task.status === "queued" || task.status === "awaiting_review") {
+      const idx = this.queue.indexOf(id);
+      if (idx >= 0) this.queue.splice(idx, 1);
+      this.transition(id, "canceled");
+    }
+    return this.store.get(id)!;
+  }
+
+  /** 半自动回填：存 article，仍停在 awaiting_review，等触发导出。 */
+  setArticle(id: string, article: Task["article"]): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    return this.store.update(id, { article: article ?? null });
+  }
+
+  /** 换图：改某页配图时间戳。 */
+  swap(id: string, req: SwapImageRequest): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (!task.article) throw new Error("任务尚无 article，无法换图");
+    const pages = task.article.pages;
+    if (req.pageIndex < 0 || req.pageIndex >= pages.length) {
+      throw new Error(`pageIndex 越界: ${req.pageIndex}（共 ${pages.length} 页）`);
+    }
+    const next = structuredClone(task.article);
+    next.pages[req.pageIndex]!.image = req.image;
+    return this.store.update(id, { article: next });
+  }
+
+  /** 导出 docx（M8）：awaiting_review → running → completed。 */
+  async exportDocx(id: string): Promise<{ docxPath: string; warnings: string[] }> {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (!task.article) throw new Error("任务尚无 article，无法导出（semi 模式请先回填）");
+    if (!task.workDir) throw new Error("任务无 workDir（下载/抽帧未完成？）");
+
+    this.transition(id, "running");
+    this.store.update(id, { currentStep: "docx" });
+    this.bus.emit({ type: "progress", taskId: id, progress: { step: "docx", message: "生成 docx…" } });
+    try {
+      const td = new TaskDir(task.workDir);
+      const { docxPath, warnings } = await runDocx(task.article, td);
+      this.store.update(id, { outputDocx: docxPath, currentStep: null });
+      this.transition(id, "completed");
+      this.bus.emit({ type: "completed", taskId: id, outputDocx: docxPath });
+      return { docxPath, warnings };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.store.update(id, { error: msg });
+      this.transition(id, "failed");
+      this.bus.emit({ type: "failed", taskId: id, error: msg });
+      throw err;
+    }
+  }
+
+  // ---- 内部 ----
+
+  private transition(id: string, to: TaskStatus): void {
+    const current = this.store.get(id);
+    if (current && !canTransition(current.status, to)) {
+      // 不抛错——记日志即可，避免竞态把整个 worker 拖崩。
+      process.stderr.write(`[orchestrator] 非法状态迁移 ${current.status} → ${to} (task ${id})\n`);
+    }
+    this.store.update(id, { status: to });
+    this.bus.emit({ type: "status_changed", taskId: id, status: to });
+  }
+
+  private pump(): void {
+    if (this.active) return; // 串行：同时只跑一个
+    const next = this.queue.shift();
+    if (!next) return;
+    this.active = true;
+    void this.runTask(next).finally(() => {
+      this.active = false;
+      this.pump();
+    });
+  }
+
+  private async runTask(id: string): Promise<void> {
+    const task = this.store.get(id);
+    if (!task || task.status === "canceled") return;
+
+    const ac = new AbortController();
+    this.running.set(id, ac);
+    try {
+      this.transition(id, "running");
+      this.store.update(id, { error: null });
+      await runToGrids(task.params, {
+        workRoot: this.opts.workRoot,
+        // 任务级 browser 优先，回退到启动时的全局 DIGGO_BROWSER 默认。
+        browser: task.params.browser ?? this.opts.browser,
+        signal: ac.signal,
+        onInfo: ({ workDir, videoTitle }) => {
+          this.store.update(id, { workDir, videoTitle });
+        },
+        onStep: (progress) => {
+          this.store.update(id, { currentStep: progress.step });
+          this.bus.emit({ type: "progress", taskId: id, progress });
+        },
+      });
+      // semi / 未接 Gemini 的 auto：停在 awaiting_review 等人工回填。
+      this.store.update(id, { currentStep: null });
+      this.transition(id, "awaiting_review");
+    } catch (err) {
+      if (ac.signal.aborted) {
+        this.transition(id, "canceled");
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.store.update(id, { error: msg });
+        this.transition(id, "failed");
+        this.bus.emit({ type: "failed", taskId: id, error: msg });
+      }
+    } finally {
+      this.running.delete(id);
+    }
+  }
+}

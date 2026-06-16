@@ -32,6 +32,21 @@ export type VideoQuality = 1080 | 1440;
 /** 文章生成模式。auto=调 Gemini API；semi=网页版人工粘贴回填。 */
 export type ArticleMode = "auto" | "semi";
 
+/**
+ * 下载时取哪个浏览器的 cookie（yt-dlp --cookies-from-browser）。
+ * YouTube 现常要求登录验证（"Sign in to confirm you're not a bot"），此时必须带 cookie。
+ * 取 yt-dlp 支持的常用子集。
+ */
+export type CookieBrowser =
+  | "safari"
+  | "chrome"
+  | "edge"
+  | "firefox"
+  | "brave"
+  | "chromium"
+  | "opera"
+  | "vivaldi";
+
 /** 发布/导出目标。 */
 export type ExportTarget = "local" | "feishu";
 
@@ -46,6 +61,8 @@ export interface TaskParams {
   dedupThreshold?: number;
   /** 文章生成模式。 */
   mode: ArticleMode;
+  /** 用哪个浏览器的 cookie 下载（--cookies-from-browser）；YouTube 需登录验证时必填，省略=不带 cookie。 */
+  browser?: CookieBrowser;
   /** 选用的 Prompt 模板 ID；省略用默认模板。 */
   promptTemplateId?: string;
   /** 是否执行 M10 视频切片（可选、默认 false）。 */
@@ -174,14 +191,32 @@ export interface Task {
 //  GET  /tasks                                                -> Task[]
 //  GET  /tasks/:id                                            -> Task
 //  GET  /tasks/:id/frames                                     -> Frame[]  (逐秒全集，供换图)
+//  GET  /tasks/:id/grids                                      -> GridList (03_grids 文件名清单，供半自动回填取图)
 //  POST /tasks/:id/swap      body: SwapImageRequest           -> Task
 //  POST /tasks/:id/article   body: Article (半自动回填)        -> Task
 //  POST /tasks/:id/export    body: ExportRequest              -> ExportResult
 //  POST /tasks/:id/cancel                                     -> Task
 //
+//  --- 静态资源（给浏览器看图；引擎按任务 workDir 内取，含路径穿越防护）---
+//  GET  /static/:id/grids/:file   -> image/jpeg   宫格图字节（03_grids/<file>）
+//  GET  /static/:id/hd/:file      -> image/jpeg   逐秒 HD 单帧（01_hd/<HH_MM_SS>.jpg，配图预览/后续换图）
+//
+//  --- 事件流 ---
+//  GET  /events                   -> text/event-stream   SSE 全局事件流，逐条推送 EngineEvent
+//
+//  半自动(semi)说明：EngineEvent.awaiting_review 携带的 article 是 auto 模式的 Gemini 草稿；
+//  semi 模式在 M6(grids) 完成后【没有 article】，引擎改发 status_changed → "awaiting_review"。
+//  UI 据 GET /tasks/:id 发现 article 为空且 params.mode==="semi" 时，展示宫格图 + 文章 JSON 回填框。
+//
 
 export interface SubmitResult {
   ids: TaskId[];
+}
+
+/** GET /tasks/:id/grids 返回：03_grids 下的宫格图文件名（不含路径，按序）。 */
+export interface GridList {
+  /** 文件名如 "grid_001.jpg"，经 GET /static/:id/grids/:file 取字节。 */
+  files: string[];
 }
 
 export interface SwapImageRequest {

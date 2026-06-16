@@ -1,0 +1,17 @@
+# 仓库根 workspace（CLAUDE.md §4.1）。shared/ 仅类型，无 package.json，靠各自 tsconfig 的 @shared/* 别名引用。
+packages:
+  - engine
+  - ui
+
+# esbuild（tsx/vitest 依赖）、sharp（M5 phash）、better-sqlite3（P2 任务库）带原生构建脚本；本环境策略要求显式批准。
+# 注：better-sqlite3 是原生模块，P3b/P4 打包需经 electron-rebuild 编译、含 .node 的包放 asarUnpack（CLAUDE.md §8）。
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - better-sqlite3
+  - vue-demi
+allowBuilds:
+  esbuild: true
+  sharp: true
+  better-sqlite3: true
+  vue-demi: true

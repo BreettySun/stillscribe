@@ -6,19 +6,25 @@
   "description": "视频生成图文文章工具 — Node/TS 命令行引擎（P1）",
   "scripts": {
     "run": "tsx src/run.ts",
+    "dev": "tsx watch src/serve.ts",
+    "serve": "tsx src/serve.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "setup-tools": "tsx scripts/setup-tools.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.19.21",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "better-sqlite3": "^11.8.0",
     "docx": "^9.7.1",
+    "fastify": "^5.2.0",
     "sharp": "^0.35.1"
   }
 }

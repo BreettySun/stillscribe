@@ -12,6 +12,8 @@ export interface RunResult {
 export interface RunOptions {
   /** 超时（毫秒）；省略则不限时。 */
   timeoutMs?: number;
+  /** 取消信号；abort 时 SIGKILL 子进程并 reject。 */
+  signal?: AbortSignal;
 }
 
 /**
@@ -21,6 +23,9 @@ export interface RunOptions {
 export function runCmd(args: string[], opts: RunOptions = {}): Promise<RunResult> {
   const [cmd, ...rest] = args;
   if (!cmd) throw new Error("runCmd: 空命令");
+  if (opts.signal?.aborted) {
+    return Promise.reject(new Error(`命令已取消: ${cmd}`));
+  }
   // 回显到 stderr，方便排查；不进 stdout 以免污染可解析输出
   process.stderr.write(`$ ${args.join(" ")}\n`);
 
@@ -29,6 +34,16 @@ export function runCmd(args: string[], opts: RunOptions = {}): Promise<RunResult
     let stdout = "";
     let stderr = "";
     let timer: NodeJS.Timeout | undefined;
+
+    const onAbort = () => {
+      child.kill("SIGKILL");
+      reject(new Error(`命令已取消: ${cmd}`));
+    };
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
+    };
 
     if (opts.timeoutMs !== undefined) {
       timer = setTimeout(() => {
@@ -41,12 +56,12 @@ export function runCmd(args: string[], opts: RunOptions = {}): Promise<RunResult
     child.stderr.on("data", (d) => (stderr += d.toString()));
 
     child.on("error", (err) => {
-      if (timer) clearTimeout(timer);
+      cleanup();
       reject(new Error(`无法启动 ${cmd}: ${err.message}`));
     });
 
     child.on("close", (code) => {
-      if (timer) clearTimeout(timer);
+      cleanup();
       if (code !== 0) {
         const tail = stderr.trim().split("\n").slice(-20).join("\n");
         reject(
