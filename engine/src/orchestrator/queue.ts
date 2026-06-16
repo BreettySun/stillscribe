@@ -35,6 +35,8 @@ export interface OrchestratorOptions {
   workRoot: string;
   /** --cookies-from-browser（可选）。 */
   browser?: string;
+  /** cookies.txt 路径（--cookies）；优先于 browser。 */
+  cookiesFile?: string;
 }
 
 export class Orchestrator {
@@ -166,6 +168,7 @@ export class Orchestrator {
         workRoot: this.opts.workRoot,
         // 任务级 browser 优先，回退到启动时的全局 DIGGO_BROWSER 默认。
         browser: task.params.browser ?? this.opts.browser,
+        cookiesFile: this.opts.cookiesFile,
         signal: ac.signal,
         onInfo: ({ workDir, videoTitle }) => {
           this.store.update(id, { workDir, videoTitle });

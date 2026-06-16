@@ -74,6 +74,8 @@ export const useTasksStore = defineStore("tasks", () => {
   async function submit(params: TaskParams[]): Promise<TaskId[]> {
     const body: TaskParams | BatchSubmit = params.length === 1 ? params[0]! : { tasks: params };
     const { ids } = await api.submit(body);
+    // 乐观刷新：即使 SSE 偶发断连/重连有空窗，也保证新任务立即可见。
+    await Promise.all(ids.map((id) => refresh(id).catch(() => {})));
     return ids;
   }
 

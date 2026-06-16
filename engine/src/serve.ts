@@ -16,12 +16,17 @@ const workRoot = process.env.DIGGO_WORK_ROOT
 const host = process.env.DIGGO_HOST ?? "127.0.0.1";
 const port = Number(process.env.DIGGO_PORT ?? 8787);
 const browser = process.env.DIGGO_BROWSER || undefined;
+const cookiesFile = process.env.DIGGO_COOKIES_FILE || undefined;
 
 mkdirSync(workRoot, { recursive: true });
 
 const store = new TaskStore(path.join(workRoot, "tasks.db"));
 const bus = new EventBus();
-const orchestrator = new Orchestrator(store, bus, { workRoot, ...(browser ? { browser } : {}) });
+const orchestrator = new Orchestrator(store, bus, {
+  workRoot,
+  ...(browser ? { browser } : {}),
+  ...(cookiesFile ? { cookiesFile } : {}),
+});
 const app = buildServer({ store, bus, orchestrator });
 
 orchestrator.recover();

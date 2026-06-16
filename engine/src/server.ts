@@ -220,10 +220,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   // ---- SSE 事件流 ----
   app.get("/events", (req, reply) => {
+    // hijack 直写 socket 会绕过 @fastify/cors，需手动补 CORS 头（与 origin:true 一致，反射来源）。
+    // 否则桌面 App 渲染进程跨源（localhost:5173 → 127.0.0.1:port）订阅 SSE 会被浏览器拦截。
+    const origin = req.headers.origin;
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
     });
     reply.raw.write(": connected\n\n");
     const unsub = bus.subscribe((e) => {

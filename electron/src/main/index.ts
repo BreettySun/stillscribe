@@ -4,6 +4,7 @@
  * IPC 仅用于 OS 能力（reveal/notify）。
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -39,14 +40,19 @@ function getFreePort(): Promise<number> {
 
 /** spawn 引擎并监督：非主动退出则带退避重启（限次数）。 */
 function startEngine(workRoot: string): void {
+	// Electron 下 --cookies-from-browser 读 Chrome 钥匙串常失败 → 若工作目录有 cookies.txt 则用 --cookies（更可靠）。
+	const cookiesFile = path.join(workRoot, "cookies.txt");
+	const env: NodeJS.ProcessEnv = {
+		...process.env,
+		DIGGO_HOST: "127.0.0.1",
+		DIGGO_PORT: String(enginePort),
+		DIGGO_WORK_ROOT: workRoot,
+	};
+	if (existsSync(cookiesFile)) env.DIGGO_COOKIES_FILE = cookiesFile;
+
 	engine = spawn("pnpm", ["--filter", "@diggo/engine", "serve"], {
 		cwd: REPO_ROOT,
-		env: {
-			...process.env,
-			DIGGO_HOST: "127.0.0.1",
-			DIGGO_PORT: String(enginePort),
-			DIGGO_WORK_ROOT: workRoot,
-		},
+		env,
 		stdio: ["ignore", "inherit", "inherit"],
 	});
 	engine.on("exit", (code, signal) => {

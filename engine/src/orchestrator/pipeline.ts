@@ -26,6 +26,8 @@ export interface PipelineHooks {
   signal?: AbortSignal;
   /** --cookies-from-browser（命令行用；server 端通常 undefined）。 */
   browser?: string;
+  /** Netscape cookies.txt 路径（--cookies）；优先于 browser，Electron 下更可靠。 */
+  cookiesFile?: string;
   /** M2 拿到 videoId/title 并建好目录后回调（编排器用来回填 workDir/videoTitle）。 */
   onInfo?(info: { workDir: string; videoTitle: string }): void | Promise<void>;
   /** 每进入一步回调一次（编排器据此更新 currentStep 并推 SSE）。 */
@@ -61,13 +63,13 @@ export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Prom
 
   ckCancel(hooks.signal);
   await emit("download", "取视频信息…");
-  const { videoId, title } = await fetchVideoInfo(params.url, hooks.browser);
+  const { videoId, title } = await fetchVideoInfo(params.url, hooks.browser, hooks.cookiesFile);
   const td = TaskDir.create(hooks.workRoot, videoId, title);
   await hooks.onInfo?.({ workDir: td.root, videoTitle: title });
 
   ckCancel(hooks.signal);
   await emit("download", `下载 (<=${params.quality}p)…`);
-  const { mp4 } = await download(params.url, td.source, params.quality, hooks.browser);
+  const { mp4 } = await download(params.url, td.source, params.quality, hooks.browser, hooks.cookiesFile);
 
   ckCancel(hooks.signal);
   await emit("frames", "抽帧 (fps=1 → webp 640x360+水印 / hd 1280x720)…");

@@ -28,6 +28,20 @@ describe("M2 yt-dlp arg-builders（与已验证命令逐字对齐）", () => {
     expect(a.at(-1)).toBe("URL");
   });
 
+  it("buildInfoArgs cookiesFile 优先于 browser（用 --cookies，不用 --cookies-from-browser）", () => {
+    const a = buildInfoArgs("URL", "chrome", "/tmp/c.txt");
+    expect(a).toContain("--cookies");
+    expect(a[a.indexOf("--cookies") + 1]).toBe("/tmp/c.txt");
+    expect(a).not.toContain("--cookies-from-browser");
+    expect(a.at(-1)).toBe("URL");
+  });
+
+  it("buildDownloadArgs 带 cookiesFile", () => {
+    const a = buildDownloadArgs("URL", "/t/source", 1080, undefined, "/tmp/c.txt");
+    expect(a[a.indexOf("--cookies") + 1]).toBe("/tmp/c.txt");
+    expect(a).not.toContain("--cookies-from-browser");
+  });
+
   it("buildDownloadArgs 画质/字幕/输出模板", () => {
     const a = buildDownloadArgs("URL", "/t/source", 1080);
     expect(a).toContain("-f");

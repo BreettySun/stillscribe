@@ -53,9 +53,11 @@ async function runPipeline(cli: Cli): Promise<void> {
     mode: "semi",
   };
 
+  const cookiesFile = process.env.DIGGO_COOKIES_FILE || undefined;
   const { taskDir: td, videoId, videoTitle, frames, grids } = await runToGrids(params, {
     workRoot: cli.workRoot,
     browser: cli.browser,
+    ...(cookiesFile ? { cookiesFile } : {}),
     onInfo: ({ workDir, videoTitle }) => console.error(`[M2] ${videoTitle}\n     工作目录: ${workDir}`),
     onStep: ({ step, message }) => console.error(`[${step}] ${message ?? ""}`),
   });
