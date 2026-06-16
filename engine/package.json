@@ -1,0 +1,24 @@
+{
+  "name": "@diggo/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "视频生成图文文章工具 — Node/TS 命令行引擎（P1）",
+  "scripts": {
+    "run": "tsx src/run.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "setup-tools": "tsx scripts/setup-tools.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "sharp": "^0.35.1"
+  }
+}

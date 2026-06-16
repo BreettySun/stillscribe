@@ -220,6 +220,8 @@ export type EngineEvent =
 export const DEFAULTS = {
   quality: 1080 as VideoQuality,
   dedup: true,
+  /** phash 去重默认阈值（64 位汉明距离）；需按真实素材校准。 */
+  dedupThreshold: 15,
   mode: "semi" as ArticleMode,
   /** 限流：单批最大任务数。 */
   maxBatchSize: 10,

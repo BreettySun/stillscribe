@@ -18,7 +18,7 @@
 - **UI 宿主**：**Electron**（主进程 Node + 渲染进程 Vue 3）+ Vite + TypeScript；打包用 **electron-builder**
 - **引擎**：Node.js LTS + TypeScript，Web 框架 Fastify 或 Hono
 - **关键库**：`docx`(dolanmiu) 生成 Word、`sharp`(+phash) 去重、`better-sqlite3` 任务库
-- **外部 CLI**（内置二进制）：yt-dlp、ffmpeg/ffprobe、ImageMagick(magick/montage)、cwebp
+- **外部 CLI**（内置二进制）：yt-dlp、ffmpeg/ffprobe（宫格拼图改用 ffmpeg `tile` 滤镜，已弃用 ImageMagick）
 - **包管理**：pnpm 或 bun（全程统一一种）
 - **打包**：electron-builder；原生模块经 **electron-rebuild** 编译，CLI 经 **extraResources** 内置
 
@@ -99,7 +99,7 @@
 | M2 下载 | yt-dlp 取 mp4+字幕 | 默认 1080p（`<=`）、人工+自动英文字幕转 srt、`--cookies-from-browser` |
 | M3 帧生成 | 一趟 ffmpeg | 同时产 640×360+水印 webp 全集 与 1280 HD 全集；无二次编码 |
 | M5 去重 | sharp/phash 选代表帧 | 默认开；只产代表帧清单；全集不动 |
-| M6 宫格图 | montage 拼图 | 输入是代表帧，10×5/组 |
+| M6 宫格图 | ffmpeg `tile` 滤镜拼图（原 ImageMagick montage，为自包含已弃用） | 输入是代表帧，10×5/组，cell 320×180 |
 | M7 文章 | Gemini → 结构化 JSON | 输出对齐 `Article` 类型；中文说明进 notes |
 | M8 docx | docx(dolanmiu) 程序化生成 | 配图取 1280 HD、等比居中；一次生成，不走"先生成再调图" |
 | M9 发布 | 本地 docx / 飞书 | 飞书 API 待定，先本地 |

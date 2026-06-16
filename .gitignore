@@ -8,3 +8,9 @@ workspace/
 .agents/
 skills-lock.json
 .DS_Store
+
+node_modules/
+work/
+engine/work/
+# 内置 CLI 二进制：经 `pnpm setup-tools` 下载，不进 git（P4 由 extraResources 打包）
+bin/
