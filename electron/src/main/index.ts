@@ -94,7 +94,7 @@ function createWindow(origin: string): BrowserWindow {
 		minWidth: 900,
 		minHeight: 600,
 		show: false,
-		title: "diggo-press",
+		title: "",
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/index.js"),
 			contextIsolation: true,
