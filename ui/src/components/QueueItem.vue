@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 单条队列项：缩略图 + 标题 + 状态徽章 + 进度 + 状态操作。展示型，操作走 store。 */
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { TrashOutline } from "@vicons/ionicons5";
 import type { Task, TaskStatus } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
@@ -50,6 +50,8 @@ function onDelete(): void {
 }
 // 处理中的任务须先取消再删除（与引擎中止存在竞态，引擎也会拒绝）。
 const canDelete = computed(() => props.task.status !== "running");
+// popconfirm 打开时光标移到弹层、item 失去 :hover，需强制保持删除按钮可见。
+const confirmOpen = ref(false);
 </script>
 
 <template>
@@ -121,17 +123,18 @@ const canDelete = computed(() => props.task.status !== "running");
 		<div
 			v-if="canDelete"
 			class="delete-wrap"
+			:class="{ open: confirmOpen }"
 			@click.stop>
 			<n-popconfirm
 				positive-text="删除"
 				negative-text="取消"
-				@positive-click="onDelete">
+				@positive-click="onDelete"
+				@update:show="(v: boolean) => (confirmOpen = v)">
 				<template #trigger>
 					<n-button
 						class="delete-btn"
 						size="tiny"
 						quaternary
-						circle
 						type="error"
 						aria-label="删除任务">
 						<template #icon>
@@ -214,7 +217,8 @@ const canDelete = computed(() => props.task.status !== "running");
 	transition: opacity 0.12s ease;
 }
 .item:hover .delete-wrap,
-.item.selected .delete-wrap {
+.item.selected .delete-wrap,
+.delete-wrap.open {
 	opacity: 1;
 }
 </style>
