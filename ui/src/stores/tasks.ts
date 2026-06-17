@@ -43,6 +43,11 @@ export const useTasksStore = defineStore("tasks", () => {
     const cur = byId.value[id];
     if (cur) byId.value[id] = { ...cur, ...p };
   }
+  function drop(id: TaskId): void {
+    delete byId.value[id];
+    delete progress.value[id];
+    if (selectedId.value === id) selectedId.value = null;
+  }
   function titleOf(id: TaskId): string {
     const t = byId.value[id];
     return t?.videoTitle ?? t?.params.url ?? id;
@@ -78,6 +83,9 @@ export const useTasksStore = defineStore("tasks", () => {
         patch(e.taskId, { status: "failed", error: e.error });
         notify("任务失败", `${titleOf(e.taskId)}：${e.error}`);
         break;
+      case "task_deleted":
+        drop(e.taskId);
+        break;
     }
   }
 
@@ -91,6 +99,10 @@ export const useTasksStore = defineStore("tasks", () => {
 
   async function cancel(id: TaskId): Promise<void> {
     upsert(await api.cancel(id));
+  }
+  async function remove(id: TaskId): Promise<void> {
+    await api.remove(id);
+    drop(id); // 乐观移除；SSE 的 task_deleted 再次 drop 也幂等。
   }
   async function saveArticle(id: TaskId, article: Article): Promise<void> {
     upsert(await api.saveArticle(id, article));
@@ -117,6 +129,7 @@ export const useTasksStore = defineStore("tasks", () => {
     applyEvent,
     submit,
     cancel,
+    remove,
     saveArticle,
     swap,
     exportDocx,

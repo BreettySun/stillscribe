@@ -38,6 +38,9 @@ export const api = {
 
   cancel: (id: string) => fetch(`${BASE}/tasks/${id}/cancel`, { method: "POST" }).then(parse<Task>),
 
+  remove: (id: string) =>
+    fetch(`${BASE}/tasks/${id}`, { method: "DELETE" }).then(parse<{ ok: true }>),
+
   saveArticle: (id: string, article: Article) =>
     fetch(`${BASE}/tasks/${id}/article`, {
       method: "POST",

@@ -246,7 +246,8 @@ export type EngineEvent =
   | { type: "progress"; taskId: TaskId; progress: StepProgress }
   | { type: "awaiting_review"; taskId: TaskId; article: Article }
   | { type: "completed"; taskId: TaskId; outputDocx: string }
-  | { type: "failed"; taskId: TaskId; error: string };
+  | { type: "failed"; taskId: TaskId; error: string }
+  | { type: "task_deleted"; taskId: TaskId };
 
 // ============================================================
 // UI 偏好设置（持久化到引擎 SQLite —— 铁律 #9：不用浏览器存储）

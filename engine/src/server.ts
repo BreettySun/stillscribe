@@ -200,6 +200,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.post("/tasks/:id/cancel", (req) => orchestrator.cancel((req.params as { id: string }).id));
 
+  app.delete("/tasks/:id", (req): { ok: true } => {
+    const id = (req.params as { id: string }).id;
+    taskOr404(id);
+    orchestrator.remove(id);
+    return { ok: true };
+  });
+
   // ---- UI 偏好设置（持久化到 SQLite，跨刷新/重启保留）----
   const readUISettings = (): UISettings => {
     const theme = settings.get("theme");

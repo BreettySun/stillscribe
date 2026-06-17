@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 单条队列项：缩略图 + 标题 + 状态徽章 + 进度 + 状态操作。展示型，操作走 store。 */
 import { computed } from "vue";
+import { TrashOutline } from "@vicons/ionicons5";
 import type { Task, TaskStatus } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
 import { api } from "../api/client";
@@ -44,6 +45,11 @@ function onRetry(): void {
 function onOpen(): void {
 	if (props.task.outputDocx) revealInFolder(props.task.outputDocx);
 }
+function onDelete(): void {
+	void store.remove(props.task.id);
+}
+// 处理中的任务须先取消再删除（与引擎中止存在竞态，引擎也会拒绝）。
+const canDelete = computed(() => props.task.status !== "running");
 </script>
 
 <template>
@@ -111,11 +117,37 @@ function onOpen(): void {
 				:height="4"
 				style="margin-top: 6px" />
 		</div>
+
+		<div
+			v-if="canDelete"
+			class="delete-wrap"
+			@click.stop>
+			<n-popconfirm
+				positive-text="删除"
+				negative-text="取消"
+				@positive-click="onDelete">
+				<template #trigger>
+					<n-button
+						class="delete-btn"
+						size="tiny"
+						quaternary
+						circle
+						type="error"
+						aria-label="删除任务">
+						<template #icon>
+							<n-icon :component="TrashOutline" />
+						</template>
+					</n-button>
+				</template>
+				确定删除这个任务？（产物文件保留）
+			</n-popconfirm>
+		</div>
 	</div>
 </template>
 
 <style scoped>
 .item {
+	position: relative;
 	display: flex;
 	gap: 10px;
 	padding: 10px 12px;
@@ -173,5 +205,16 @@ function onOpen(): void {
 }
 .actions {
 	margin-top: 4px;
+}
+.delete-wrap {
+	position: absolute;
+	right: 8px;
+	bottom: 6px;
+	opacity: 0;
+	transition: opacity 0.12s ease;
+}
+.item:hover .delete-wrap,
+.item.selected .delete-wrap {
+	opacity: 1;
 }
 </style>

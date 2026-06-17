@@ -83,6 +83,17 @@ export class Orchestrator {
     return this.store.get(id)!;
   }
 
+  /** 删除任务：从队列/库中移除并广播。running 须先取消（避免与中止竞态）。产物文件不动。 */
+  remove(id: string): void {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (task.status === "running") throw new Error("正在处理的任务请先取消再删除");
+    const idx = this.queue.indexOf(id);
+    if (idx >= 0) this.queue.splice(idx, 1);
+    this.store.delete(id);
+    this.bus.emit({ type: "task_deleted", taskId: id });
+  }
+
   /** 半自动回填：存 article，仍停在 awaiting_review，等触发导出。 */
   setArticle(id: string, article: Task["article"]): Task {
     const task = this.store.get(id);

@@ -141,6 +141,11 @@ export class TaskStore {
     return this.get(id)!;
   }
 
+  /** 删除任务记录（不动 workDir 产物文件）。 */
+  delete(id: string): void {
+    this.db.prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
+  }
+
   close(): void {
     this.db.close();
   }
