@@ -58,12 +58,12 @@ const ratio = computed(() => progress.value?.ratio);
 .url {
   margin: 0;
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
   word-break: break-all;
 }
 .msg {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 </style>

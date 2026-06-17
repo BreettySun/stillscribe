@@ -249,6 +249,20 @@ export type EngineEvent =
   | { type: "failed"; taskId: TaskId; error: string };
 
 // ============================================================
+// UI 偏好设置（持久化到引擎 SQLite —— 铁律 #9：不用浏览器存储）
+// ============================================================
+
+export type ThemeMode = "auto" | "light" | "dark";
+
+export interface UISettings {
+  theme: ThemeMode;
+}
+
+export const UI_DEFAULTS: UISettings = {
+  theme: "auto",
+};
+
+// ============================================================
 // 默认值（建议常量，前后端共用，避免魔法数）
 // ============================================================
 

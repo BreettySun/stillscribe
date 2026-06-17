@@ -12,6 +12,7 @@ import type {
   SwapImageRequest,
   Task,
   TaskParams,
+  UISettings,
 } from "@shared/types";
 import { engineOrigin } from "../bridge";
 
@@ -57,6 +58,14 @@ export const api = {
       headers: JSON_HEADERS,
       body: JSON.stringify({ target: "local" }),
     }).then(parse<ExportResult>),
+
+  getSettings: () => fetch(`${BASE}/settings`).then(parse<UISettings>),
+  saveSettings: (patch: Partial<UISettings>) =>
+    fetch(`${BASE}/settings`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(patch),
+    }).then(parse<UISettings>),
 
   listGrids: (id: string) => fetch(`${BASE}/tasks/${id}/grids`).then(parse<GridList>),
   listFrames: (id: string) => fetch(`${BASE}/tasks/${id}/frames`).then(parse<Frame[]>),

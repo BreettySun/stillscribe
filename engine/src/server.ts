@@ -20,11 +20,15 @@ import {
   type SubmitResult,
   type SwapImageRequest,
   type TaskParams,
+  type ThemeMode,
+  type UISettings,
+  UI_DEFAULTS,
 } from "@shared/types";
 import { TaskDir } from "./paths.ts";
 import { loadManifest } from "./modules/m5-select.ts";
 import { validateArticle } from "./validate.ts";
 import type { TaskStore } from "./store/tasks.ts";
+import type { SettingsStore } from "./store/settings.ts";
 import type { EventBus } from "./orchestrator/events.ts";
 import type { Orchestrator } from "./orchestrator/queue.ts";
 
@@ -32,7 +36,10 @@ export interface ServerDeps {
   store: TaskStore;
   bus: EventBus;
   orchestrator: Orchestrator;
+  settings: SettingsStore;
 }
+
+const THEME_MODES: readonly ThemeMode[] = ["auto", "light", "dark"];
 
 class HttpError extends Error {
   constructor(readonly statusCode: number, message: string) {
@@ -115,7 +122,7 @@ async function listFrames(workDir: string): Promise<Frame[]> {
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
-  const { store, bus, orchestrator } = deps;
+  const { store, bus, orchestrator, settings } = deps;
   const app = Fastify({ logger: false });
 
   app.register(cors, { origin: true }); // 本地开发：允许浏览器直连（生产走 Vite 代理同源）
@@ -192,6 +199,25 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post("/tasks/:id/cancel", (req) => orchestrator.cancel((req.params as { id: string }).id));
+
+  // ---- UI 偏好设置（持久化到 SQLite，跨刷新/重启保留）----
+  const readUISettings = (): UISettings => {
+    const theme = settings.get("theme");
+    return {
+      theme: THEME_MODES.includes(theme as ThemeMode) ? (theme as ThemeMode) : UI_DEFAULTS.theme,
+    };
+  };
+
+  app.get("/settings", (): UISettings => readUISettings());
+
+  app.post("/settings", (req): UISettings => {
+    const body = (req.body ?? {}) as Partial<UISettings>;
+    if (body.theme !== undefined) {
+      if (!THEME_MODES.includes(body.theme)) throw new HttpError(400, `非法 theme: ${body.theme}`);
+      settings.set("theme", body.theme);
+    }
+    return readUISettings();
+  });
 
   // ---- 静态产物（含路径穿越防护）----
   const sendImage = async (reply: import("fastify").FastifyReply, dir: string, file: string) => {

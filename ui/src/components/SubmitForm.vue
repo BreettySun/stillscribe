@@ -91,6 +91,6 @@ async function onSubmit(): Promise<void> {
 .form-hint {
   margin: 0;
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 </style>

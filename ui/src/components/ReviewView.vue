@@ -165,10 +165,10 @@ async function onExport(): Promise<void> {
 .hint {
   margin: 0;
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 .notes {
-  color: #9aa3b2;
+  color: var(--c-muted);
   font-size: 13px;
 }
 .grids {

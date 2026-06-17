@@ -62,7 +62,7 @@ function shown(): Frame[] {
 <style scoped>
 .picker {
   margin-top: 12px;
-  border-top: 1px solid var(--n-border-color, #2a2f3a);
+  border-top: 1px solid var(--c-border);
   padding-top: 12px;
 }
 .picker-bar {
@@ -73,10 +73,10 @@ function shown(): Frame[] {
 }
 .picker-title {
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 .picker-error {
-  color: #f85149;
+  color: var(--c-error);
   font-size: 13px;
 }
 .grid {
@@ -101,13 +101,13 @@ function shown(): Frame[] {
   display: block;
 }
 .cell.rep {
-  border-color: #d29922; /* 去重代表帧描边 */
+  border-color: var(--c-warn); /* 去重代表帧描边 */
 }
 .cell.current {
-  border-color: #5b9dff; /* 当前页配图 */
+  border-color: var(--c-accent); /* 当前页配图 */
 }
 .cell:hover {
-  outline: 2px solid #5b9dff;
+  outline: 2px solid var(--c-accent);
 }
 .ts {
   position: absolute;

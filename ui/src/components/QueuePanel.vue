@@ -45,7 +45,7 @@ const store = useTasksStore();
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--n-border-color, #2a2f3a);
+  border-bottom: 1px solid var(--c-border);
   flex-shrink: 0;
 }
 .queue-title {

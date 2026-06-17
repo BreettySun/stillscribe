@@ -102,14 +102,14 @@ function onOpen(): void {
   border-left: 2px solid transparent;
 }
 .item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--c-hover);
 }
 .item.selected {
-  background: rgba(91, 157, 255, 0.12);
-  border-left-color: #5b9dff;
+  background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  border-left-color: var(--c-accent);
 }
 .item.attention {
-  border-left-color: #d29922;
+  border-left-color: var(--c-warn);
 }
 .thumb {
   width: 64px;
@@ -117,7 +117,7 @@ function onOpen(): void {
   flex-shrink: 0;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--c-hover);
 }
 .thumb img {
   width: 100%;
@@ -147,7 +147,7 @@ function onOpen(): void {
 }
 .step {
   font-size: 11px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 .actions {
   margin-top: 4px;

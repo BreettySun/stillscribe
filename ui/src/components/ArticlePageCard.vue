@@ -40,7 +40,7 @@ const excerpt = computed(() => {
   margin-bottom: 12px;
 }
 .page-card.editing {
-  border-color: #5b9dff;
+  border-color: var(--c-accent);
 }
 .page-row {
   display: flex;
@@ -56,7 +56,7 @@ const excerpt = computed(() => {
   border: 2px solid transparent;
 }
 .page-img.active {
-  border-color: #5b9dff;
+  border-color: var(--c-accent);
 }
 .page-img img {
   width: 100%;
@@ -83,7 +83,7 @@ const excerpt = computed(() => {
 }
 .page-no {
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 .subhead {
   margin: 6px 0;
@@ -92,7 +92,7 @@ const excerpt = computed(() => {
 .body {
   margin: 0;
   font-size: 13px;
-  color: #c4c9d4;
+  color: var(--c-text);
   line-height: 1.5;
 }
 </style>

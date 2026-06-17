@@ -85,6 +85,6 @@ const summary = computed(() => {
 }
 .adv-summary {
   font-size: 12px;
-  color: #9aa3b2;
+  color: var(--c-muted);
 }
 </style>

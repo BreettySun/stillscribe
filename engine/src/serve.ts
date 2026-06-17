@@ -8,6 +8,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { resolveWorkRoot } from "./paths.ts";
 import { TaskStore } from "./store/tasks.ts";
+import { SettingsStore } from "./store/settings.ts";
 import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
 import { buildServer } from "./server.ts";
@@ -20,12 +21,13 @@ const browser = process.env.DIGGO_BROWSER || undefined;
 mkdirSync(workRoot, { recursive: true });
 
 const store = new TaskStore(path.join(workRoot, "tasks.db"));
+const settings = new SettingsStore(path.join(workRoot, "settings.db"));
 const bus = new EventBus();
 const orchestrator = new Orchestrator(store, bus, {
   workRoot,
   ...(browser ? { browser } : {}),
 });
-const app = buildServer({ store, bus, orchestrator });
+const app = buildServer({ store, bus, orchestrator, settings });
 
 orchestrator.recover();
 
@@ -43,6 +45,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     app.close().finally(() => {
       store.close();
+      settings.close();
       process.exit(0);
     });
   });
