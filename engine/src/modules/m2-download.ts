@@ -1,9 +1,13 @@
 /**
  * M2 下载：yt-dlp 封装。
  * - 默认 1080p（`<=` 语义，无对应分辨率自动降级）
- * - 人工 + 自动英文字幕转 srt（--sub-langs "en.*,en"）
+ * - 人工 + 自动英文字幕转 srt（仅真·英文轨，不抓自动翻译轨——见下）
  * - 支持 --cookies-from-browser
  * 幂等：source/ 已有 mp4 直接复用，不重复下载。
+ *
+ * 字幕作为次要产物**单独一趟、失败不致命**：视频先下成，再尽力取英文字幕。
+ * 字幕语言用精确白名单而非 `en.*` 通配——通配会命中 YouTube 自动翻译轨（en-sl/en-fr… 上百条），
+ * 逐条下载极易触发 HTTP 429。缺字幕时 M7 仍可工作（srt 允许为 null）。
  */
 import { glob } from "node:fs/promises";
 import path from "node:path";
@@ -51,6 +55,9 @@ export async function fetchVideoInfo(
   return { videoId: line.slice(0, tab), title: line.slice(tab + 1) };
 }
 
+const OUTPUT_TEMPLATE = "%(title).80s [%(id)s].%(ext)s";
+
+/** 视频下载（不含字幕——字幕单独一趟，见 buildSubsArgs）。 */
 export function buildDownloadArgs(
   url: string,
   sourceDir: string,
@@ -63,10 +70,33 @@ export function buildDownloadArgs(
     "--no-playlist",
     "-f", `bv*[height<=${quality}]+ba/b[height<=${quality}]`,
     "--merge-output-format", "mp4",
+    "-o", path.join(sourceDir, OUTPUT_TEMPLATE),
+  ];
+  pushCookieArgs(args, browser, cookiesFile);
+  args.push(url);
+  return args;
+}
+
+/**
+ * 仅取英文字幕（人工 + 自动），转 srt。
+ * 语言用精确白名单（不含自动翻译轨 en-xx），并放慢请求节流以避开 429。
+ */
+export function buildSubsArgs(
+  url: string,
+  sourceDir: string,
+  browser?: string,
+  cookiesFile?: string,
+): string[] {
+  const args = [
+    toolPath("yt-dlp"),
+    "--no-playlist",
+    "--skip-download",
     "--write-subs", "--write-auto-subs",
-    "--sub-langs", "en.*,en",
+    "--sub-langs", "en,en-orig,en-US,en-GB",
     "--convert-subs", "srt",
-    "-o", path.join(sourceDir, "%(title).80s [%(id)s].%(ext)s"),
+    "--sleep-subtitles", "1",
+    "--retries", "5",
+    "-o", path.join(sourceDir, OUTPUT_TEMPLATE),
   ];
   pushCookieArgs(args, browser, cookiesFile);
   args.push(url);
@@ -104,7 +134,7 @@ export async function findOutputs(sourceDir: string): Promise<DownloadOutputs> {
   return { mp4: mp4s[0]!, srt: srts[0] ?? null };
 }
 
-/** 下载（幂等）。 */
+/** 下载（幂等）：先下视频（致命），再尽力取英文字幕（失败不致命）。 */
 export async function download(
   url: string,
   sourceDir: string,
@@ -113,9 +143,20 @@ export async function download(
   cookiesFile?: string,
 ): Promise<DownloadOutputs> {
   const existing = await listFiles(sourceDir, "*.mp4");
-  if (existing.length > 0) return findOutputs(sourceDir);
-  await runCmd(buildDownloadArgs(url, sourceDir, quality, browser, cookiesFile), {
-    timeoutMs: 3_600_000,
-  });
+  if (existing.length === 0) {
+    await runCmd(buildDownloadArgs(url, sourceDir, quality, browser, cookiesFile), {
+      timeoutMs: 3_600_000,
+    });
+  }
+  // 字幕仅次要：429/无字幕等失败只记日志，不阻断流水线（srt 允许为 null）。
+  if ((await listFiles(sourceDir, "*.srt")).length === 0) {
+    try {
+      await runCmd(buildSubsArgs(url, sourceDir, browser, cookiesFile), { timeoutMs: 300_000 });
+    } catch (err) {
+      process.stderr.write(
+        `[m2] 字幕获取失败（不影响视频/继续流水线）：${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  }
   return findOutputs(sourceDir);
 }

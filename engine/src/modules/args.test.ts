@@ -7,7 +7,7 @@ beforeAll(() => {
   process.env.DIGGO_FFMPEG = process.execPath;
 });
 
-const { buildInfoArgs, buildDownloadArgs } = await import("./m2-download.ts");
+const { buildInfoArgs, buildDownloadArgs, buildSubsArgs } = await import("./m2-download.ts");
 const { buildWebpArgs, buildHdArgs } = await import("./m3-frames.ts");
 
 describe("M2 yt-dlp arg-builders（与已验证命令逐字对齐）", () => {
@@ -42,16 +42,14 @@ describe("M2 yt-dlp arg-builders（与已验证命令逐字对齐）", () => {
     expect(a).not.toContain("--cookies-from-browser");
   });
 
-  it("buildDownloadArgs 画质/字幕/输出模板", () => {
+  it("buildDownloadArgs 画质/输出模板（视频，不含字幕）", () => {
     const a = buildDownloadArgs("URL", "/t/source", 1080);
     expect(a).toContain("-f");
     expect(a[a.indexOf("-f") + 1]).toBe("bv*[height<=1080]+ba/b[height<=1080]");
-    expect(a).toEqual(expect.arrayContaining([
-      "--merge-output-format", "mp4",
-      "--write-subs", "--write-auto-subs",
-      "--sub-langs", "en.*,en",
-      "--convert-subs", "srt",
-    ]));
+    expect(a).toEqual(expect.arrayContaining(["--merge-output-format", "mp4"]));
+    // 字幕已拆到 buildSubsArgs，视频命令不再带字幕参数。
+    expect(a).not.toContain("--write-subs");
+    expect(a).not.toContain("--sub-langs");
     expect(a[a.indexOf("-o") + 1]).toBe("/t/source/%(title).80s [%(id)s].%(ext)s");
     expect(a.at(-1)).toBe("URL");
   });
@@ -59,6 +57,26 @@ describe("M2 yt-dlp arg-builders（与已验证命令逐字对齐）", () => {
   it("buildDownloadArgs 1440p", () => {
     const a = buildDownloadArgs("URL", "/t/source", 1440);
     expect(a[a.indexOf("-f") + 1]).toBe("bv*[height<=1440]+ba/b[height<=1440]");
+  });
+
+  it("buildSubsArgs：仅精确英文轨（不含自动翻译通配）+ 节流", () => {
+    const a = buildSubsArgs("URL", "/t/source");
+    expect(a).toEqual(expect.arrayContaining([
+      "--skip-download",
+      "--write-subs", "--write-auto-subs",
+      "--sub-langs", "en,en-orig,en-US,en-GB",
+      "--convert-subs", "srt",
+      "--sleep-subtitles", "1",
+    ]));
+    expect(a[a.indexOf("--sub-langs") + 1]).not.toContain("en.*");
+    expect(a[a.indexOf("-o") + 1]).toBe("/t/source/%(title).80s [%(id)s].%(ext)s");
+    expect(a.at(-1)).toBe("URL");
+  });
+
+  it("buildSubsArgs 带 cookiesFile 优先", () => {
+    const a = buildSubsArgs("URL", "/t/source", "chrome", "/tmp/c.txt");
+    expect(a[a.indexOf("--cookies") + 1]).toBe("/tmp/c.txt");
+    expect(a).not.toContain("--cookies-from-browser");
   });
 });
 

@@ -37,10 +37,14 @@ function ytDlpPath(): string {
 /** spawn 到完成；非 0 退出码 reject（含 stderr 尾部）。 */
 function runYtDlp(args: string[]): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const child = spawn(ytDlpPath(), args, { stdio: ["ignore", "ignore", "pipe"] });
+		const child = spawn(ytDlpPath(), args, {
+			stdio: ["ignore", "ignore", "pipe"],
+		});
 		let stderr = "";
 		child.stderr.on("data", (d) => (stderr += d.toString()));
-		child.on("error", (err) => reject(new Error(`无法启动 yt-dlp: ${err.message}`)));
+		child.on("error", (err) =>
+			reject(new Error(`无法启动 yt-dlp: ${err.message}`)),
+		);
 		child.on("close", (code) => {
 			if (code === 0) return resolve();
 			const tail = stderr.trim().split("\n").slice(-15).join("\n");
@@ -57,13 +61,19 @@ async function refreshCookies(browser: string): Promise<{ kept: number }> {
 	const workRoot = getWorkRoot();
 	mkdirSync(workRoot, { recursive: true });
 	const out = path.join(workRoot, "cookies.txt");
-	const tmp = path.join(tmpdir(), `diggo-cookies-${process.pid}-${Date.now()}.txt`);
+	const tmp = path.join(
+		tmpdir(),
+		`diggo-cookies-${process.pid}-${Date.now()}.txt`,
+	);
 	try {
 		await runYtDlp([
-			"--cookies-from-browser", browser,
-			"--cookies", tmp,
+			"--cookies-from-browser",
+			browser,
+			"--cookies",
+			tmp,
 			"--skip-download",
-			"--print", "%(id)s",
+			"--print",
+			"%(id)s",
 			"https://www.youtube.com/watch?v=jNQXAC9IVRw",
 		]);
 		const { out: filtered, kept } = filterYouTube(await readFile(tmp, "utf-8"));
