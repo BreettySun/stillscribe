@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { DEFAULTS, type CookieBrowser, type TaskParams, type VideoQuality } from "@shared/types";
+/** 新建任务态（无选中）：URL 主输入 + 折叠的高级选项 + 提交 CTA。 */
+import { computed, reactive, ref } from "vue";
+import { useMessage } from "naive-ui";
+import { DEFAULTS, type TaskParams } from "@shared/types";
+import { useTasksStore } from "../stores/tasks";
+import AdvancedOptions, { type AdvancedModel } from "./AdvancedOptions.vue";
 
-const emit = defineEmits<{ submit: [params: TaskParams[]] }>();
-defineProps<{ busy?: boolean }>();
-
-const BROWSERS: CookieBrowser[] = ["chrome", "safari", "edge", "firefox", "brave", "chromium", "opera", "vivaldi"];
+const store = useTasksStore();
+const message = useMessage();
 
 const urlsText = ref("");
-const quality = ref<VideoQuality>(DEFAULTS.quality);
-const dedup = ref(DEFAULTS.dedup);
-const mode = ref(DEFAULTS.mode); // 本版仅 semi（半自动回填）
-const threshold = ref<number | null>(DEFAULTS.dedupThreshold);
-// YouTube 常需登录验证，默认带 chrome cookie；选"不带"则不传 --cookies-from-browser。
-const browser = ref<CookieBrowser | "">("chrome");
+const busy = ref(false);
+
+const adv = reactive<AdvancedModel>({
+  quality: DEFAULTS.quality,
+  mode: DEFAULTS.mode,
+  browser: "chrome", // YouTube 常需登录验证，默认带 chrome cookie。
+  dedup: DEFAULTS.dedup,
+  threshold: DEFAULTS.dedupThreshold,
+});
 
 const urls = computed(() =>
   urlsText.value
@@ -22,62 +27,70 @@ const urls = computed(() =>
     .filter(Boolean),
 );
 
-function onSubmit(): void {
+async function onSubmit(): Promise<void> {
   if (urls.value.length === 0) return;
   const params: TaskParams[] = urls.value.map((url) => ({
     url,
-    quality: quality.value,
-    dedup: dedup.value,
-    ...(dedup.value && threshold.value != null ? { dedupThreshold: threshold.value } : {}),
-    mode: mode.value,
-    ...(browser.value ? { browser: browser.value } : {}),
+    quality: adv.quality,
+    dedup: adv.dedup,
+    ...(adv.dedup && adv.threshold != null ? { dedupThreshold: adv.threshold } : {}),
+    mode: adv.mode,
+    ...(adv.browser ? { browser: adv.browser } : {}),
   }));
-  emit("submit", params);
-  urlsText.value = "";
+  busy.value = true;
+  try {
+    const ids = await store.submit(params);
+    urlsText.value = "";
+    message.success(`已提交 ${ids.length} 个任务`);
+    if (ids[0]) store.setSelected(ids[0]);
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : String(e));
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
 <template>
-  <section class="panel">
-    <h2>提交任务</h2>
-    <div class="field">
-      <label>YouTube URL（每行一个，可批量，单批 ≤ {{ DEFAULTS.maxBatchSize }}）</label>
-      <textarea v-model="urlsText" rows="4" placeholder="https://www.youtube.com/watch?v=..." />
+  <n-space vertical :size="18">
+    <div>
+      <h2 class="form-title">新建任务</h2>
+      <p class="form-hint">YouTube URL（每行一个，单批 ≤ {{ DEFAULTS.maxBatchSize }}）</p>
     </div>
-    <div class="row" style="margin-top: 12px">
-      <div class="field">
-        <label>画质</label>
-        <select v-model.number="quality">
-          <option :value="1080">1080p</option>
-          <option :value="1440">1440p</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>模式</label>
-        <select v-model="mode">
-          <option value="semi">semi（半自动回填）</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>下载 cookie（YouTube 登录验证用）</label>
-        <select v-model="browser">
-          <option value="">不带 cookie</option>
-          <option v-for="b in BROWSERS" :key="b" :value="b">{{ b }}</option>
-        </select>
-      </div>
-      <div class="field">
-        <label><input type="checkbox" v-model="dedup" /> 去重选代表帧</label>
-      </div>
-      <div class="field" v-if="dedup">
-        <label>去重阈值（phash 汉明距离）</label>
-        <input type="number" v-model.number="threshold" min="0" max="64" style="width: 90px" />
-      </div>
-    </div>
-    <div class="row" style="margin-top: 14px">
-      <button :disabled="urls.length === 0 || busy" @click="onSubmit">
-        提交 {{ urls.length > 1 ? `${urls.length} 个` : "" }}任务
-      </button>
-      <span class="muted" v-if="urls.length > 1">将作为一批提交</span>
-    </div>
-  </section>
+
+    <n-input
+      v-model:value="urlsText"
+      type="textarea"
+      :rows="5"
+      placeholder="https://www.youtube.com/watch?v=..."
+      :autosize="{ minRows: 5 }"
+    />
+
+    <n-space align="center">
+      <n-button
+        type="primary"
+        size="large"
+        :disabled="urls.length === 0"
+        :loading="busy"
+        @click="onSubmit"
+      >
+        ▶ 提交{{ urls.length > 1 ? ` ${urls.length} 个` : "" }}任务
+      </n-button>
+      <span class="form-hint">默认即可开始</span>
+    </n-space>
+
+    <AdvancedOptions v-model="adv" />
+  </n-space>
 </template>
+
+<style scoped>
+.form-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.form-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #9aa3b2;
+}
+</style>

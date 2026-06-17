@@ -21,10 +21,20 @@ export const useTasksStore = defineStore("tasks", () => {
   const byId = ref<Record<TaskId, Task>>({});
   /** 各任务最近一条进度（不属于 Task 快照，单独存供实时展示）。 */
   const progress = ref<Record<TaskId, StepProgress>>({});
+  /** 当前选中的任务 —— 取代 vue-router，驱动右栏 master-detail（文档 §5，仅内存不持久化）。 */
+  const selectedId = ref<TaskId | null>(null);
 
   const list = computed(() =>
     Object.values(byId.value).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   );
+
+  const selected = computed<Task | null>(() =>
+    selectedId.value ? (byId.value[selectedId.value] ?? null) : null,
+  );
+
+  function setSelected(id: TaskId | null): void {
+    selectedId.value = id;
+  }
 
   function upsert(t: Task): void {
     byId.value[t.id] = t;
@@ -97,7 +107,11 @@ export const useTasksStore = defineStore("tasks", () => {
   return {
     byId,
     progress,
+    selectedId,
+    selected,
     list,
+    setSelected,
+    titleOf,
     fetchAll,
     refresh,
     applyEvent,

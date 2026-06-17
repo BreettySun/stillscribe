@@ -1,0 +1,5 @@
+dist/
+node_modules/
+
+# auto-imports.d.ts / components.d.ts 由 unplugin 生成，但需提交：
+# pnpm build 会先跑 vue-tsc 再跑 vite build，干净克隆下 dts 必须已存在才能过类型检查。
