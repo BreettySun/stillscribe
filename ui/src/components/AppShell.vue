@@ -114,10 +114,17 @@ onUnmounted(() => disconnect?.());
 				</n-button>
 			</n-dropdown>
 		</header>
-		<div class="app-body">
-			<QueuePanel class="app-queue" />
-			<ContextPane class="app-context" />
-		</div>
+		<n-split
+			:default-size="0.25"
+			:max="0.5"
+			:min="'300px'">
+			<template #1>
+				<QueuePanel class="app-queue" />
+			</template>
+			<template #2>
+				<ContextPane class="app-context" />
+			</template>
+		</n-split>
 	</div>
 </template>
 
@@ -164,7 +171,6 @@ onUnmounted(() => disconnect?.());
 	min-height: 0;
 }
 .app-queue {
-	width: 340px;
 	flex-shrink: 0;
 	border-right: 1px solid var(--c-border);
 	min-height: 0;

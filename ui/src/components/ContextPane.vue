@@ -8,15 +8,16 @@ const store = useTasksStore();
 </script>
 
 <template>
-  <div class="context">
-    <TaskDetail v-if="store.selected" :task="store.selected" />
-    <SubmitForm v-else />
-  </div>
+	<div class="context">
+		<TaskDetail
+			v-if="store.selected"
+			:task="store.selected" />
+		<SubmitForm v-else />
+	</div>
 </template>
 
 <style scoped>
 .context {
-  padding: 20px 24px;
-  max-width: 900px;
+	padding: 20px 24px;
 }
 </style>
