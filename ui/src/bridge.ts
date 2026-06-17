@@ -18,3 +18,23 @@ export function revealInFolder(path: string): void {
 export function notify(title: string, body: string): void {
   bridgeImpl?.notify(title, body);
 }
+
+/**
+ * 刷新 youtube cookie。
+ * - 桌面端：走 Electron 主进程 IPC（可访问浏览器钥匙串）。
+ * - 纯 Web：走引擎 HTTP 端点（Web 下引擎是普通终端进程，能读钥匙串）。
+ * 用裸 fetch（而非 api/client）以避免与 api/client→bridge 的循环依赖。
+ */
+export async function refreshCookies(browser: string): Promise<{ kept: number }> {
+  if (bridgeImpl) return bridgeImpl.refreshCookies(browser);
+  const res = await fetch(`${engineOrigin}/cookies/refresh`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ browser }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return (await res.json()) as { kept: number };
+}

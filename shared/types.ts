@@ -257,10 +257,13 @@ export type ThemeMode = "auto" | "light" | "dark";
 
 export interface UISettings {
   theme: ThemeMode;
+  /** 自动刷新 cookie 时从哪个浏览器导出登录态。 */
+  cookieBrowser: CookieBrowser;
 }
 
 export const UI_DEFAULTS: UISettings = {
   theme: "auto",
+  cookieBrowser: "chrome",
 };
 
 // ============================================================

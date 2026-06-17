@@ -27,7 +27,7 @@ const orchestrator = new Orchestrator(store, bus, {
   workRoot,
   ...(browser ? { browser } : {}),
 });
-const app = buildServer({ store, bus, orchestrator, settings });
+const app = buildServer({ store, bus, orchestrator, settings, workRoot });
 
 orchestrator.recover();
 

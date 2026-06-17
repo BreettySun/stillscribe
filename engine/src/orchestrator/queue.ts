@@ -83,6 +83,20 @@ export class Orchestrator {
     return this.store.get(id)!;
   }
 
+  /** 原地重试：failed/canceled 任务重置为 queued 重新入队（流水线幂等，跳过已完成步骤），保留同一 id。 */
+  retry(id: string): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (task.status !== "failed" && task.status !== "canceled") {
+      throw new Error(`仅失败/已取消的任务可重试，当前: ${task.status}`);
+    }
+    this.store.update(id, { status: "queued", error: null, currentStep: null });
+    this.bus.emit({ type: "status_changed", taskId: id, status: "queued" });
+    this.queue.push(id);
+    this.pump();
+    return this.store.get(id)!;
+  }
+
   /** 删除任务：从队列/库中移除并广播。running 须先取消（避免与中止竞态）。产物文件不动。 */
   remove(id: string): void {
     const task = this.store.get(id);

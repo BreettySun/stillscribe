@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { darkTheme, lightTheme, zhCN, dateZhCN } from "naive-ui";
-import { useThemeStore } from "./stores/theme";
+import { useSettingsStore } from "./stores/settings";
 import AppShell from "./components/AppShell.vue";
 
-const theme = useThemeStore();
-const naiveTheme = computed(() => (theme.isDark ? darkTheme : lightTheme));
+const settings = useSettingsStore();
+const naiveTheme = computed(() => (settings.isDark ? darkTheme : lightTheme));
 </script>
 
 <template>

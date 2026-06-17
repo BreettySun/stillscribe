@@ -5,6 +5,9 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
+import { mkdirSync } from "node:fs";
+import { readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import {
 	app,
@@ -14,9 +17,62 @@ import {
 	ipcMain,
 	shell,
 } from "electron";
+import { filterYouTube } from "@engine/modules/cookies-filter";
 
 // 运行时 __dirname = electron/out/main → 上溯三级到仓库根。
 const REPO_ROOT = path.resolve(__dirname, "../../..");
+
+/** 工作根（与引擎一致）：开发态用仓库 engine/work，可被 DIGGO_WORK_ROOT 覆盖。 */
+function getWorkRoot(): string {
+	return process.env.DIGGO_WORK_ROOT ?? path.join(REPO_ROOT, "engine", "work");
+}
+
+/** yt-dlp 绝对路径（禁止依赖 PATH，铁律 #1）：env 覆盖 > 打包内置 > 仓库 bin/。 */
+function ytDlpPath(): string {
+	if (process.env.DIGGO_YT_DLP) return process.env.DIGGO_YT_DLP;
+	if (app.isPackaged) return path.join(process.resourcesPath, "bin", "yt-dlp");
+	return path.join(REPO_ROOT, "bin", "yt-dlp");
+}
+
+/** spawn 到完成；非 0 退出码 reject（含 stderr 尾部）。 */
+function runYtDlp(args: string[]): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(ytDlpPath(), args, { stdio: ["ignore", "ignore", "pipe"] });
+		let stderr = "";
+		child.stderr.on("data", (d) => (stderr += d.toString()));
+		child.on("error", (err) => reject(new Error(`无法启动 yt-dlp: ${err.message}`)));
+		child.on("close", (code) => {
+			if (code === 0) return resolve();
+			const tail = stderr.trim().split("\n").slice(-15).join("\n");
+			reject(new Error(`yt-dlp 退出码 ${code}\n${tail}`));
+		});
+	});
+}
+
+/**
+ * 从浏览器导出 youtube.com cookie 到 <workRoot>/cookies.txt（主进程执行：可访问钥匙串并弹系统授权框）。
+ * 只保留 youtube.com（filterYouTube），不落盘无关站点 cookie。
+ */
+async function refreshCookies(browser: string): Promise<{ kept: number }> {
+	const workRoot = getWorkRoot();
+	mkdirSync(workRoot, { recursive: true });
+	const out = path.join(workRoot, "cookies.txt");
+	const tmp = path.join(tmpdir(), `diggo-cookies-${process.pid}-${Date.now()}.txt`);
+	try {
+		await runYtDlp([
+			"--cookies-from-browser", browser,
+			"--cookies", tmp,
+			"--skip-download",
+			"--print", "%(id)s",
+			"https://www.youtube.com/watch?v=jNQXAC9IVRw",
+		]);
+		const { out: filtered, kept } = filterYouTube(await readFile(tmp, "utf-8"));
+		await writeFile(out, filtered, "utf-8");
+		return { kept };
+	} finally {
+		await rm(tmp, { force: true });
+	}
+}
 
 let engine: ChildProcess | null = null;
 let enginePort = 0;
@@ -151,13 +207,17 @@ ipcMain.on("diggo:notify", (_e, payload: { title?: string; body?: string }) => {
 	}).show();
 });
 
+// 刷新 cookie：在主进程（可访问浏览器钥匙串、可弹系统授权框）执行，写入引擎 workRoot/cookies.txt。
+ipcMain.handle("diggo:refresh-cookies", (_e, browser: unknown) =>
+	refreshCookies(typeof browser === "string" && browser ? browser : "chrome"),
+);
+
 app.whenReady().then(async () => {
 	enginePort = await getFreePort();
 	const origin = `http://127.0.0.1:${enginePort}`;
 	// 开发态：与 `pnpm dev:engine` 共用 engine/work（同一个 tasks.db，队列互通）。
 	// P4 打包后仓库目录不存在/不可写，届时改回 app.getPath("userData")。
-	const workRoot =
-		process.env.DIGGO_WORK_ROOT ?? path.join(REPO_ROOT, "engine", "work");
+	const workRoot = getWorkRoot();
 
 	startEngine(workRoot);
 	await waitHealthy(origin);

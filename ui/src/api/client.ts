@@ -38,6 +38,8 @@ export const api = {
 
   cancel: (id: string) => fetch(`${BASE}/tasks/${id}/cancel`, { method: "POST" }).then(parse<Task>),
 
+  retry: (id: string) => fetch(`${BASE}/tasks/${id}/retry`, { method: "POST" }).then(parse<Task>),
+
   remove: (id: string) =>
     fetch(`${BASE}/tasks/${id}`, { method: "DELETE" }).then(parse<{ ok: true }>),
 

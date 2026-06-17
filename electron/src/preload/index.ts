@@ -20,4 +20,7 @@ contextBridge.exposeInMainWorld("diggo", {
 	/** 系统通知。 */
 	notify: (title: string, body: string): void =>
 		ipcRenderer.send("diggo:notify", { title, body }),
+	/** 从浏览器刷新 youtube cookie（主进程读钥匙串），返回写入条数。 */
+	refreshCookies: (browser: string): Promise<{ kept: number }> =>
+		ipcRenderer.invoke("diggo:refresh-cookies", browser),
 });

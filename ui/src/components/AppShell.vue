@@ -13,17 +13,18 @@ import {
 	type Component,
 } from "vue";
 import { NIcon, useThemeVars, type DropdownOption } from "naive-ui";
-import { DesktopOutline, MoonOutline, SunnyOutline } from "@vicons/ionicons5";
+import { DesktopOutline, MoonOutline, SunnyOutline, GlobeOutline } from "@vicons/ionicons5";
+import type { CookieBrowser } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
 import { useEngineStore } from "../stores/engine";
-import { useThemeStore, type ThemeMode } from "../stores/theme";
+import { useSettingsStore, type ThemeMode } from "../stores/settings";
 import { connectEvents } from "../api/events";
 import QueuePanel from "./queue/QueuePanel.vue";
 import ContextPane from "./ContextPane.vue";
 
 const store = useTasksStore();
 const engine = useEngineStore();
-const theme = useThemeStore();
+const settings = useSettingsStore();
 const vars = useThemeVars();
 
 let disconnect: (() => void) | undefined;
@@ -55,7 +56,7 @@ const cssVars = computed(() => ({
 watchEffect(() => {
 	document.body.style.background = vars.value.bodyColor;
 	document.body.style.color = vars.value.textColor2;
-	document.documentElement.style.colorScheme = theme.isDark ? "dark" : "light";
+	document.documentElement.style.colorScheme = settings.isDark ? "dark" : "light";
 });
 
 const menuIcon = (cmp: Component) => () =>
@@ -66,16 +67,29 @@ const THEME_OPTIONS: DropdownOption[] = [
 	{ label: "深色", key: "dark", icon: menuIcon(MoonOutline) },
 ];
 const currentIcon = computed(() =>
-	theme.mode === "light"
+	settings.mode === "light"
 		? SunnyOutline
-		: theme.mode === "dark"
+		: settings.mode === "dark"
 			? MoonOutline
 			: DesktopOutline,
 );
 
+// Cookie 来源浏览器（自动刷新 cookie 时从哪个浏览器导出登录态）。
+const BROWSERS: CookieBrowser[] = [
+	"chrome",
+	"safari",
+	"edge",
+	"firefox",
+	"brave",
+	"chromium",
+	"opera",
+	"vivaldi",
+];
+const BROWSER_OPTIONS: DropdownOption[] = BROWSERS.map((b) => ({ label: b, key: b }));
+
 onMounted(async () => {
 	// 初始 HTTP 拉取一次，之后由 SSE 增量更新。
-	void theme.load(); // 恢复持久化的主题偏好
+	void settings.load(); // 恢复持久化的 UI 偏好（主题 + cookie 浏览器）
 	await store.fetchAll().catch(() => engine.setStatus("disconnected"));
 	disconnect = connectEvents({
 		onEvent: (e) => store.applyEvent(e),
@@ -101,8 +115,24 @@ onUnmounted(() => disconnect?.());
 			</span>
 			<n-dropdown
 				trigger="click"
+				:options="BROWSER_OPTIONS"
+				:value="settings.cookieBrowser"
+				@select="(k: CookieBrowser) => settings.setCookieBrowser(k)">
+				<n-button
+					quaternary
+					circle
+					size="small"
+					:title="`Cookie 来源浏览器：${settings.cookieBrowser}`"
+					aria-label="Cookie 来源浏览器">
+					<template #icon>
+						<n-icon :component="GlobeOutline" />
+					</template>
+				</n-button>
+			</n-dropdown>
+			<n-dropdown
+				trigger="click"
 				:options="THEME_OPTIONS"
-				@select="(k: ThemeMode) => theme.setMode(k)">
+				@select="(k: ThemeMode) => settings.setMode(k)">
 				<n-button
 					quaternary
 					circle

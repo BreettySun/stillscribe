@@ -40,7 +40,7 @@ function onCancel(): void {
 	void store.cancel(props.task.id);
 }
 function onRetry(): void {
-	void store.submit([props.task.params]);
+	void store.retry(props.task.id);
 }
 function onOpen(): void {
 	if (props.task.outputDocx) revealInFolder(props.task.outputDocx);

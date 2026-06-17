@@ -11,14 +11,8 @@
  * 原理：--cookies-from-browser 从浏览器读 cookie（需终端可访问钥匙串），先写出全量临时文件，
  *       再过滤成只含 youtube.com 的 cookie 写入最终文件（不把无关站点的 cookie 落盘）。
  */
-import { mkdirSync } from "node:fs";
-import { readFile, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { toolPath } from "../src/cli/tools.ts";
-import { runCmd } from "../src/cli/shell.ts";
-import { resolveWorkRoot, cookiesPath } from "../src/paths.ts";
-import { filterYouTube } from "../src/modules/cookies-filter.ts";
+import { resolveWorkRoot } from "../src/paths.ts";
+import { refreshCookies } from "../src/modules/cookies-refresh.ts";
 
 function flag(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -27,33 +21,12 @@ function flag(name: string, fallback: string): string {
 
 async function main(): Promise<void> {
   const browser = flag("browser", process.env.DIGGO_BROWSER || "chrome");
-  // 默认用 "Me at the zoo"（YouTube 第一条视频，极稳定）作触发；cookie 来自浏览器，与该视频无关。
   const url = flag("url", "https://www.youtube.com/watch?v=jNQXAC9IVRw");
   const workRoot = resolveWorkRoot();
 
-  mkdirSync(workRoot, { recursive: true });
-  const out = cookiesPath(workRoot);
-  const tmp = path.join(tmpdir(), `diggo-cookies-${process.pid}.txt`);
-
-  console.error(`从 ${browser} 读取 cookie（仅保留 youtube.com）→ ${out}`);
-  try {
-    await runCmd(
-      [
-        toolPath("yt-dlp"),
-        "--cookies-from-browser", browser,
-        "--cookies", tmp,
-        "--skip-download",
-        "--print", "%(id)s",
-        url,
-      ],
-      { timeoutMs: 120_000 },
-    );
-    const { out: filtered, kept } = filterYouTube(await readFile(tmp, "utf-8"));
-    await writeFile(out, filtered, "utf-8");
-    console.error(`✅ 已写入 ${kept} 条 youtube.com cookie: ${out}（引擎按任务即时探测，无需重启 App 即生效）`);
-  } finally {
-    await rm(tmp, { force: true });
-  }
+  console.error(`从 ${browser} 读取 cookie（仅保留 youtube.com）→ ${workRoot}/cookies.txt`);
+  const { kept, out } = await refreshCookies({ workRoot, browser, url });
+  console.error(`✅ 已写入 ${kept} 条 youtube.com cookie: ${out}（引擎按任务即时探测，无需重启 App 即生效）`);
 }
 
 main().catch((err: unknown) => {

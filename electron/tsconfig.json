@@ -14,7 +14,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["../shared/*"],
+      "@engine/*": ["../engine/src/*"]
     }
   },
   "include": ["src/main/**/*.ts", "src/preload/**/*.ts", "electron.vite.config.ts"]

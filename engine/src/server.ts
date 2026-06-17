@@ -26,6 +26,7 @@ import {
 } from "@shared/types";
 import { TaskDir } from "./paths.ts";
 import { loadManifest } from "./modules/m5-select.ts";
+import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -37,6 +38,8 @@ export interface ServerDeps {
   bus: EventBus;
   orchestrator: Orchestrator;
   settings: SettingsStore;
+  /** 工作根目录，用于 cookie 刷新落盘 <workRoot>/cookies.txt。 */
+  workRoot: string;
 }
 
 const THEME_MODES: readonly ThemeMode[] = ["auto", "light", "dark"];
@@ -122,7 +125,7 @@ async function listFrames(workDir: string): Promise<Frame[]> {
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
-  const { store, bus, orchestrator, settings } = deps;
+  const { store, bus, orchestrator, settings, workRoot } = deps;
   const app = Fastify({ logger: false });
 
   app.register(cors, { origin: true }); // 本地开发：允许浏览器直连（生产走 Vite 代理同源）
@@ -207,11 +210,30 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { ok: true };
   });
 
+  app.post("/tasks/:id/retry", (req) => orchestrator.retry((req.params as { id: string }).id));
+
+  // ---- Cookie 刷新（从浏览器导出 youtube.com cookie 到 <workRoot>/cookies.txt）----
+  app.post("/cookies/refresh", async (req): Promise<{ kept: number }> => {
+    const body = (req.body ?? {}) as { browser?: CookieBrowser };
+    const browser = body.browser ?? readUISettings().cookieBrowser;
+    if (!COOKIE_BROWSERS.includes(browser)) throw new HttpError(400, `非法 browser: ${browser}`);
+    try {
+      const { kept } = await refreshCookies({ workRoot, browser });
+      return { kept };
+    } catch (err) {
+      throw new HttpError(500, err instanceof Error ? err.message : String(err));
+    }
+  });
+
   // ---- UI 偏好设置（持久化到 SQLite，跨刷新/重启保留）----
   const readUISettings = (): UISettings => {
     const theme = settings.get("theme");
+    const cookieBrowser = settings.get("cookieBrowser");
     return {
       theme: THEME_MODES.includes(theme as ThemeMode) ? (theme as ThemeMode) : UI_DEFAULTS.theme,
+      cookieBrowser: COOKIE_BROWSERS.includes(cookieBrowser as CookieBrowser)
+        ? (cookieBrowser as CookieBrowser)
+        : UI_DEFAULTS.cookieBrowser,
     };
   };
 
@@ -222,6 +244,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (body.theme !== undefined) {
       if (!THEME_MODES.includes(body.theme)) throw new HttpError(400, `非法 theme: ${body.theme}`);
       settings.set("theme", body.theme);
+    }
+    if (body.cookieBrowser !== undefined) {
+      if (!COOKIE_BROWSERS.includes(body.cookieBrowser)) {
+        throw new HttpError(400, `非法 cookieBrowser: ${body.cookieBrowser}`);
+      }
+      settings.set("cookieBrowser", body.cookieBrowser);
     }
     return readUISettings();
   });

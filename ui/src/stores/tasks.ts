@@ -15,7 +15,13 @@ import type {
   TaskParams,
 } from "@shared/types";
 import { api } from "../api/client";
-import { notify } from "../bridge";
+import { notify, refreshCookies } from "../bridge";
+import { useSettingsStore } from "./settings";
+
+/** yt-dlp 撞 YouTube 登录验证的特征（引擎把 stderr 尾部存进 task.error）。 */
+function isBotCheck(msg?: string): boolean {
+  return !!msg && /not a bot|Sign in to confirm|--cookies-from-browser|--cookies\b/i.test(msg);
+}
 
 export const useTasksStore = defineStore("tasks", () => {
   const byId = ref<Record<TaskId, Task>>({});
@@ -81,7 +87,11 @@ export const useTasksStore = defineStore("tasks", () => {
         break;
       case "failed":
         patch(e.taskId, { status: "failed", error: e.error });
-        notify("任务失败", `${titleOf(e.taskId)}：${e.error}`);
+        if (isBotCheck(e.error)) {
+          void autoRefreshAndRetry(e.taskId);
+        } else {
+          notify("任务失败", `${titleOf(e.taskId)}：${e.error}`);
+        }
         break;
       case "task_deleted":
         drop(e.taskId);
@@ -99,6 +109,35 @@ export const useTasksStore = defineStore("tasks", () => {
 
   async function cancel(id: TaskId): Promise<void> {
     upsert(await api.cancel(id));
+  }
+  async function retry(id: TaskId): Promise<void> {
+    upsert(await api.retry(id));
+  }
+
+  // 自动刷新 cookie + 重试：按 url 去重避免无限循环；批量同时失败只刷一次。
+  const autoHandledUrls = new Set<string>();
+  let refreshing: Promise<{ kept: number }> | null = null;
+  async function autoRefreshAndRetry(id: TaskId): Promise<void> {
+    const task = byId.value[id];
+    if (!task) return;
+    const url = task.params.url;
+    if (autoHandledUrls.has(url)) {
+      // 刷新过仍失败：不再自动重试，提示用户人工处理。
+      notify("任务失败", `${titleOf(id)}：刷新 Cookie 后仍需登录验证，请检查浏览器是否已登录 YouTube`);
+      return;
+    }
+    autoHandledUrls.add(url);
+    const browser = useSettingsStore().cookieBrowser;
+    notify("正在刷新 Cookie", `检测到登录验证，正用 ${browser} 刷新并重试…`);
+    try {
+      refreshing ??= refreshCookies(browser);
+      await refreshing;
+      await retry(id);
+    } catch (e) {
+      notify("Cookie 刷新失败", e instanceof Error ? e.message : String(e));
+    } finally {
+      refreshing = null;
+    }
   }
   async function remove(id: TaskId): Promise<void> {
     await api.remove(id);
@@ -129,6 +168,7 @@ export const useTasksStore = defineStore("tasks", () => {
     applyEvent,
     submit,
     cancel,
+    retry,
     remove,
     saveArticle,
     swap,
