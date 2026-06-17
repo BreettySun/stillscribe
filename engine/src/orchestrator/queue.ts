@@ -12,7 +12,7 @@
  * auto 模式本版未接 Gemini，同样停在 awaiting_review（待 M7 接入）。
  */
 import type { SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
-import { TaskDir } from "../paths.ts";
+import { TaskDir, resolveCookiesFile } from "../paths.ts";
 import { runToGrids, runDocx } from "./pipeline.ts";
 import type { EventBus } from "./events.ts";
 import type { TaskStore } from "../store/tasks.ts";
@@ -35,8 +35,6 @@ export interface OrchestratorOptions {
   workRoot: string;
   /** --cookies-from-browser（可选）。 */
   browser?: string;
-  /** cookies.txt 路径（--cookies）；优先于 browser。 */
-  cookiesFile?: string;
 }
 
 export class Orchestrator {
@@ -164,11 +162,14 @@ export class Orchestrator {
     try {
       this.transition(id, "running");
       this.store.update(id, { error: null });
+      // 按任务即时探测 cookies.txt（P1 方案 A）：跑完 refresh-cookies 无需重启即生效；
+      // 文件缺失/被置空时 cookiesFile=undefined → 自动回退 --cookies-from-browser。
+      const cookiesFile = resolveCookiesFile(this.opts.workRoot);
       await runToGrids(task.params, {
         workRoot: this.opts.workRoot,
         // 任务级 browser 优先，回退到启动时的全局 DIGGO_BROWSER 默认。
         browser: task.params.browser ?? this.opts.browser,
-        cookiesFile: this.opts.cookiesFile,
+        ...(cookiesFile ? { cookiesFile } : {}),
         signal: ac.signal,
         onInfo: ({ workDir, videoTitle }) => {
           this.store.update(id, { workDir, videoTitle });

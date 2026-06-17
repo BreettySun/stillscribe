@@ -9,6 +9,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULTS, type Article, type TaskParams, type VideoQuality } from "@shared/types";
+import { resolveCookiesFile } from "./paths.ts";
 import { runToGrids, runDocx } from "./orchestrator/pipeline.ts";
 
 interface Cli {
@@ -53,7 +54,8 @@ async function runPipeline(cli: Cli): Promise<void> {
     mode: "semi",
   };
 
-  const cookiesFile = process.env.DIGGO_COOKIES_FILE || undefined;
+  // 按任务即时探测 <workRoot>/cookies.txt（或 DIGGO_COOKIES_FILE 覆盖）；无效则回退 --cookies-from-browser。
+  const cookiesFile = resolveCookiesFile(cli.workRoot);
   const { taskDir: td, videoId, videoTitle, frames, grids } = await runToGrids(params, {
     workRoot: cli.workRoot,
     browser: cli.browser,

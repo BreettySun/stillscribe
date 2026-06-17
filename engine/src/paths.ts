@@ -2,11 +2,44 @@
  * 目录结构与 HH_MM_SS 命名约定 —— 全项目唯一定义处（架构文档第 7 节、CLAUDE.md §4.2/§5）。
  * 禁止在各处硬编码路径字符串拼接，一律走这里。
  */
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Timestamp } from "@shared/types";
 
 const NAME_RE = /^(\d{2})_(\d{2})_(\d{2})$/;
+const HTTPONLY = "#HttpOnly_";
+
+/** 工作根目录解析 —— 全项目唯一定义（DIGGO_WORK_ROOT，默认 ./work）。 */
+export function resolveWorkRoot(env = process.env.DIGGO_WORK_ROOT): string {
+  return env ? path.resolve(env) : path.resolve("work");
+}
+
+/** 工作根下的 cookies.txt 约定路径（refresh-cookies 落盘点 / yt-dlp --cookies 读取点）。 */
+export function cookiesPath(workRoot: string): string {
+  return path.join(workRoot, "cookies.txt");
+}
+
+/**
+ * 解析本任务实际可用的 cookies.txt（P1 方案 A：按任务即时探测，跑完 refresh-cookies 无需重启引擎即生效）。
+ * 来源优先级：DIGGO_COOKIES_FILE 显式覆盖 > <workRoot>/cookies.txt。
+ * 仅当文件存在且含至少一条 cookie 行时返回路径；否则返回 undefined，调用方回退 --cookies-from-browser。
+ * （文件被置空/只剩注释头时视为无效 → 自动回退浏览器，而非静默撞 bot 验证。）
+ */
+export function resolveCookiesFile(workRoot: string): string | undefined {
+  const file = process.env.DIGGO_COOKIES_FILE
+    ? path.resolve(process.env.DIGGO_COOKIES_FILE)
+    : cookiesPath(workRoot);
+  if (!existsSync(file)) return undefined;
+  const hasCookie = readFileSync(file, "utf-8")
+    .split("\n")
+    .some((line) => {
+      const t = line.trim();
+      if (t === "") return false;
+      // #HttpOnly_ 是伪注释 cookie（真 cookie）；其余 # 开头是注释头。
+      return !t.startsWith("#") || t.startsWith(HTTPONLY);
+    });
+  return hasCookie ? file : undefined;
+}
 
 /** 秒数 → "HH_MM_SS"（fps=1 下帧序号即秒数，纯算术映射）。 */
 export function secondsToName(seconds: number): Timestamp {

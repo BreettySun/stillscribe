@@ -2,21 +2,20 @@
  * 引擎服务进程入口（P2）。装配 store/bus/orchestrator + Fastify，绑定 127.0.0.1。
  * 环境变量：DIGGO_WORK_ROOT（工作根，默认 ./work）、DIGGO_PORT（默认 8787）、
  *           DIGGO_HOST（默认 127.0.0.1）、DIGGO_BROWSER（yt-dlp --cookies-from-browser）。
+ * cookies.txt 不在此注入——编排器按任务即时探测 <workRoot>/cookies.txt（P1 方案 A）。
  */
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { resolveWorkRoot } from "./paths.ts";
 import { TaskStore } from "./store/tasks.ts";
 import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
 import { buildServer } from "./server.ts";
 
-const workRoot = process.env.DIGGO_WORK_ROOT
-  ? path.resolve(process.env.DIGGO_WORK_ROOT)
-  : path.resolve("work");
+const workRoot = resolveWorkRoot();
 const host = process.env.DIGGO_HOST ?? "127.0.0.1";
 const port = Number(process.env.DIGGO_PORT ?? 8787);
 const browser = process.env.DIGGO_BROWSER || undefined;
-const cookiesFile = process.env.DIGGO_COOKIES_FILE || undefined;
 
 mkdirSync(workRoot, { recursive: true });
 
@@ -25,7 +24,6 @@ const bus = new EventBus();
 const orchestrator = new Orchestrator(store, bus, {
   workRoot,
   ...(browser ? { browser } : {}),
-  ...(cookiesFile ? { cookiesFile } : {}),
 });
 const app = buildServer({ store, bus, orchestrator });
 
