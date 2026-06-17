@@ -2,7 +2,7 @@
 /** 单页：配图 + 小标题 + 正文摘要；点击配图/换图按钮进入帧选择。 */
 import { computed } from "vue";
 import type { ArticlePage, Task } from "@shared/types";
-import { api } from "../api/client";
+import { api } from "../../api/client";
 
 const props = defineProps<{ task: Task; page: ArticlePage; index: number; editing: boolean }>();
 defineEmits<{ edit: [] }>();

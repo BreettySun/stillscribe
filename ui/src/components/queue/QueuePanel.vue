@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 左栏：读 tasksStore.list 渲染队列；点击切换选中（master-detail）。 */
-import { useTasksStore } from "../stores/tasks";
+import { useTasksStore } from "../../stores/tasks";
 import QueueItem from "./QueueItem.vue";
 
 const store = useTasksStore();

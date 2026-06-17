@@ -8,8 +8,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 import type { Article, Task, Timestamp } from "@shared/types";
-import { useTasksStore } from "../stores/tasks";
-import { api } from "../api/client";
+import { useTasksStore } from "../../stores/tasks";
+import { api } from "../../api/client";
 import ArticlePageCard from "./ArticlePageCard.vue";
 import FramePicker from "./FramePicker.vue";
 import ArticleEditor from "./ArticleEditor.vue";

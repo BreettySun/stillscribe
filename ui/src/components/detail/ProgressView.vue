@@ -2,7 +2,7 @@
 /** running / queued：流水线步骤 + 进度条 + 取消。 */
 import { computed } from "vue";
 import type { PipelineStep, Task } from "@shared/types";
-import { useTasksStore } from "../stores/tasks";
+import { useTasksStore } from "../../stores/tasks";
 
 const props = defineProps<{ task: Task }>();
 const store = useTasksStore();

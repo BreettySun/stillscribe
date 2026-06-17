@@ -3,8 +3,8 @@
 import { ref } from "vue";
 import { useMessage } from "naive-ui";
 import type { Task } from "@shared/types";
-import { useTasksStore } from "../stores/tasks";
-import { isDesktop, revealInFolder } from "../bridge";
+import { useTasksStore } from "../../stores/tasks";
+import { isDesktop, revealInFolder } from "../../bridge";
 
 const props = defineProps<{ task: Task }>();
 const store = useTasksStore();

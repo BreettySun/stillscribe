@@ -3,7 +3,7 @@
 import { computed } from "vue";
 import type { Task } from "@shared/types";
 import ProgressView from "./ProgressView.vue";
-import ReviewView from "./ReviewView.vue";
+import ReviewView from "../review/ReviewView.vue";
 import ResultView from "./ResultView.vue";
 
 const props = defineProps<{ task: Task }>();

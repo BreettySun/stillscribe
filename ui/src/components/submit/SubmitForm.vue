@@ -3,7 +3,7 @@
 import { computed, reactive, ref } from "vue";
 import { useMessage } from "naive-ui";
 import { DEFAULTS, type TaskParams } from "@shared/types";
-import { useTasksStore } from "../stores/tasks";
+import { useTasksStore } from "../../stores/tasks";
 import AdvancedOptions, { type AdvancedModel } from "./AdvancedOptions.vue";
 
 const store = useTasksStore();

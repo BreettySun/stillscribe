@@ -3,9 +3,9 @@
 import { computed, ref } from "vue";
 import { TrashOutline } from "@vicons/ionicons5";
 import type { Task, TaskStatus } from "@shared/types";
-import { useTasksStore } from "../stores/tasks";
-import { api } from "../api/client";
-import { revealInFolder } from "../bridge";
+import { useTasksStore } from "../../stores/tasks";
+import { api } from "../../api/client";
+import { revealInFolder } from "../../bridge";
 
 const props = defineProps<{ task: Task; selected: boolean }>();
 const store = useTasksStore();

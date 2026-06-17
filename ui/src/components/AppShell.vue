@@ -18,7 +18,7 @@ import { useTasksStore } from "../stores/tasks";
 import { useEngineStore } from "../stores/engine";
 import { useThemeStore, type ThemeMode } from "../stores/theme";
 import { connectEvents } from "../api/events";
-import QueuePanel from "./QueuePanel.vue";
+import QueuePanel from "./queue/QueuePanel.vue";
 import ContextPane from "./ContextPane.vue";
 
 const store = useTasksStore();

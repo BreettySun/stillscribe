@@ -5,7 +5,7 @@
  */
 import { onMounted, ref } from "vue";
 import type { Frame, Timestamp } from "@shared/types";
-import { api } from "../api/client";
+import { api } from "../../api/client";
 
 const props = defineProps<{ taskId: string; current: Timestamp }>();
 const emit = defineEmits<{ pick: [image: Timestamp]; close: [] }>();
