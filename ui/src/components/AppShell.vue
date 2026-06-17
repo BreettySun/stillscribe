@@ -115,7 +115,7 @@ onUnmounted(() => disconnect?.());
 			</n-dropdown>
 		</header>
 		<n-split
-			:default-size="0.25"
+			:default-size="'360px'"
 			:max="0.5"
 			:min="'300px'">
 			<template #1>

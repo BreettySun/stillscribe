@@ -90,7 +90,9 @@ async function waitHealthy(
 function createWindow(origin: string): BrowserWindow {
 	const win = new BrowserWindow({
 		width: 1200,
-		height: 820,
+		height: 800,
+		minWidth: 900,
+		minHeight: 600,
 		show: false,
 		title: "diggo-press",
 		webPreferences: {
