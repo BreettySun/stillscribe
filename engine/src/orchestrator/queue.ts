@@ -198,6 +198,8 @@ export class Orchestrator {
         signal: ac.signal,
         onInfo: ({ workDir, videoTitle }) => {
           this.store.update(id, { workDir, videoTitle });
+          // 立即广播，否则 UI 要等下一次交互（重新拉取）才看到标题。
+          this.bus.emit({ type: "info", taskId: id, videoTitle, workDir });
         },
         onStep: (progress) => {
           this.store.update(id, { currentStep: progress.step });

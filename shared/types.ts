@@ -243,6 +243,8 @@ export interface ExportResult {
 export type EngineEvent =
   | { type: "task_created"; task: Task }
   | { type: "status_changed"; taskId: TaskId; status: TaskStatus }
+  // M2 拿到视频信息（建好任务目录）后立即推送，让 UI 实时更新标题/workDir，无需等下一次交互。
+  | { type: "info"; taskId: TaskId; videoTitle: string; workDir: string }
   | { type: "progress"; taskId: TaskId; progress: StepProgress }
   | { type: "awaiting_review"; taskId: TaskId; article: Article }
   | { type: "completed"; taskId: TaskId; outputDocx: string }

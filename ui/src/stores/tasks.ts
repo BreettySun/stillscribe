@@ -79,6 +79,9 @@ export const useTasksStore = defineStore("tasks", () => {
 			case "status_changed":
 				patch(e.taskId, { status: e.status });
 				break;
+			case "info":
+				patch(e.taskId, { videoTitle: e.videoTitle, workDir: e.workDir });
+				break;
 			case "progress":
 				progress.value[e.taskId] = e.progress;
 				patch(e.taskId, { currentStep: e.progress.step });
