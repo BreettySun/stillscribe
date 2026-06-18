@@ -30,7 +30,7 @@ const ratio = computed(() => progress.value?.ratio);
 		vertical
 		:size="20">
 		<div>
-			<h2 class="title">{{ task.videoTitle ?? "（标题待解析）" }}</h2>
+			<h2 class="title">{{ task.videoTitle ?? "标题待解析" }}</h2>
 			<p class="url">{{ task.params.url }}</p>
 		</div>
 
