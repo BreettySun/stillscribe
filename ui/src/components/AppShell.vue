@@ -13,7 +13,12 @@ import {
 	type Component,
 } from "vue";
 import { NIcon, useThemeVars, type DropdownOption } from "naive-ui";
-import { DesktopOutline, MoonOutline, SunnyOutline, GlobeOutline } from "@vicons/ionicons5";
+import {
+	DesktopOutline,
+	MoonOutline,
+	SunnyOutline,
+	GlobeOutline,
+} from "@vicons/ionicons5";
 import type { CookieBrowser } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
 import { useEngineStore } from "../stores/engine";
@@ -56,7 +61,9 @@ const cssVars = computed(() => ({
 watchEffect(() => {
 	document.body.style.background = vars.value.bodyColor;
 	document.body.style.color = vars.value.textColor2;
-	document.documentElement.style.colorScheme = settings.isDark ? "dark" : "light";
+	document.documentElement.style.colorScheme = settings.isDark
+		? "dark"
+		: "light";
 });
 
 const menuIcon = (cmp: Component) => () =>
@@ -80,12 +87,12 @@ const BROWSERS: CookieBrowser[] = [
 	"safari",
 	"edge",
 	"firefox",
-	"brave",
-	"chromium",
 	"opera",
-	"vivaldi",
 ];
-const BROWSER_OPTIONS: DropdownOption[] = BROWSERS.map((b) => ({ label: b, key: b }));
+const BROWSER_OPTIONS: DropdownOption[] = BROWSERS.map((b) => ({
+	label: b.charAt(0).toUpperCase() + b.slice(1),
+	key: b,
+}));
 
 onMounted(async () => {
 	// 初始 HTTP 拉取一次，之后由 SSE 增量更新。
@@ -105,8 +112,12 @@ onUnmounted(() => disconnect?.());
 		class="app-shell"
 		:style="cssVars">
 		<header class="app-titlebar">
+			<img
+				src="@/assets/icon/icon-trans.svg"
+				alt="Diggo Press"
+				width="24"
+				height="24" />
 			<span class="app-title">Diggo Press</span>
-			<span class="app-subtitle">YouTube 视频 → 图文文章</span>
 			<span class="app-engine">
 				<span
 					class="dot"
@@ -168,22 +179,19 @@ onUnmounted(() => disconnect?.());
 .app-titlebar {
 	display: flex;
 	align-items: center;
-	gap: 14px;
-	padding: 0 18px;
+	gap: 12px;
+	padding: 0 18px 0 14px;
 	height: 48px;
 	border-bottom: 1px solid var(--c-border);
 	flex-shrink: 0;
 }
 .app-title {
 	font-weight: 600;
-	font-size: 15px;
-}
-.app-subtitle {
-	color: var(--c-muted);
-	font-size: 12px;
+	font-size: 16px;
 }
 .app-engine {
 	margin-left: auto;
+	margin-right: 6px;
 	display: flex;
 	align-items: center;
 	gap: 6px;

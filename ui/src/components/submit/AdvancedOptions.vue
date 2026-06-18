@@ -1,37 +1,18 @@
 <script setup lang="ts">
-/** 高级选项：画质/模式/cookie/去重/阈值。默认折叠，折叠头显示摘要。 */
+/** 高级选项：画质/模式/去重/阈值。默认折叠，折叠头显示摘要。
+ * cookie 来源统一由标题栏「Cookie 来源」全局设置控制（不在此重复）。 */
 import { computed } from "vue";
-import {
-	DEFAULTS,
-	type ArticleMode,
-	type CookieBrowser,
-	type VideoQuality,
-} from "@shared/types";
+import { DEFAULTS, type ArticleMode, type VideoQuality } from "@shared/types";
 
 export interface AdvancedModel {
 	quality: VideoQuality;
 	mode: ArticleMode;
-	browser: CookieBrowser | "";
 	dedup: boolean;
 	threshold: number | null;
 }
 
 const model = defineModel<AdvancedModel>({ required: true });
 
-const BROWSERS: CookieBrowser[] = [
-	"chrome",
-	"safari",
-	"edge",
-	"firefox",
-	"brave",
-	"chromium",
-	"opera",
-	"vivaldi",
-];
-const browserOptions = [
-	{ label: "不带 cookie", value: "" },
-	...BROWSERS.map((b) => ({ label: b, value: b })),
-];
 const qualityOptions = [
 	{ label: "1080p", value: 1080 },
 	{ label: "1440p", value: 1440 },
@@ -43,7 +24,6 @@ const summaryTags = computed(() => {
 	return [
 		`${m.quality}p`,
 		m.mode,
-		m.browser || "无 cookie",
 		m.dedup ? `去重·阈值${m.threshold ?? DEFAULTS.dedupThreshold}` : "不去重",
 	];
 });
@@ -72,7 +52,7 @@ const summaryTags = computed(() => {
 				<n-grid
 					:cols="4"
 					:x-gap="16"
-					:y-gap="12"
+					:y-gap="20"
 					responsive="screen"
 					item-responsive>
 					<n-form-item-gi
@@ -88,13 +68,6 @@ const summaryTags = computed(() => {
 						<n-select
 							v-model:value="model.mode"
 							:options="modeOptions" />
-					</n-form-item-gi>
-					<n-form-item-gi
-						label="下载 cookie"
-						:span="2">
-						<n-select
-							v-model:value="model.browser"
-							:options="browserOptions" />
 					</n-form-item-gi>
 					<n-form-item-gi
 						label="相近帧去重"

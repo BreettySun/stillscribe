@@ -4,9 +4,11 @@ import { computed, reactive, ref } from "vue";
 import { useMessage } from "naive-ui";
 import { DEFAULTS, type TaskParams } from "@shared/types";
 import { useTasksStore } from "../../stores/tasks";
+import { useSettingsStore } from "../../stores/settings";
 import AdvancedOptions, { type AdvancedModel } from "./AdvancedOptions.vue";
 
 const store = useTasksStore();
+const settings = useSettingsStore();
 const message = useMessage();
 
 const urlsText = ref("");
@@ -15,7 +17,6 @@ const busy = ref(false);
 const adv = reactive<AdvancedModel>({
 	quality: DEFAULTS.quality,
 	mode: DEFAULTS.mode,
-	browser: "chrome", // YouTube 常需登录验证，默认带 chrome cookie。
 	dedup: DEFAULTS.dedup,
 	threshold: DEFAULTS.dedupThreshold,
 });
@@ -37,7 +38,8 @@ async function onSubmit(): Promise<void> {
 			? { dedupThreshold: adv.threshold }
 			: {}),
 		mode: adv.mode,
-		...(adv.browser ? { browser: adv.browser } : {}),
+		// cookie 来源统一取标题栏全局设置；没有 cookies.txt 时作 --cookies-from-browser 回退。
+		browser: settings.cookieBrowser,
 	}));
 	busy.value = true;
 	try {
@@ -80,7 +82,6 @@ async function onSubmit(): Promise<void> {
 				@click="onSubmit">
 				▶ 提交{{ urls.length > 1 ? ` ${urls.length} 个` : "" }}任务
 			</n-button>
-			<span class="form-hint">默认即可开始</span>
 		</n-space>
 
 		<AdvancedOptions v-model="adv" />
