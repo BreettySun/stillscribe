@@ -93,7 +93,23 @@ async function renameToHhmmss(outDir: string, suffix: string): Promise<number> {
   return count;
 }
 
-/** 生成两个全集（幂等：两个目录都已有产物则整步跳过）。返回 webp 帧数。 */
+/** HH_MM_SS 命名（已改名的成品帧）；中断时遗留的是 ffmpeg 原始数字名（如 `5`）。 */
+const HHMMSS_RE = /^\d{2}_\d{2}_\d{2}$/;
+
+/**
+ * 一趟抽帧是否“干净完成”：非空且全部已改名为 HH_MM_SS。
+ * 只要存在数字名残片（中断在 ffmpeg 写出后、renameToHhmmss 前被杀），即判未完成 → 需重跑。
+ * 否则弱判断（仅看目录非空）会把残片当成品跳过，导致换图画廊时间戳错乱、代表帧全失配。
+ */
+export function isCompletePass(stems: string[]): boolean {
+  return stems.length > 0 && stems.every((s) => HHMMSS_RE.test(s));
+}
+
+async function stemsOf(dir: string, suffix: string): Promise<string[]> {
+  return (await listFiles(dir, `*${suffix}`)).map((f) => f.slice(0, -suffix.length));
+}
+
+/** 生成两个全集（幂等：两个全集都“干净完成”才整步跳过）。返回 webp 帧数。 */
 export async function generateFrames(
   video: string,
   webpDir: string,
@@ -101,9 +117,9 @@ export async function generateFrames(
   signal?: AbortSignal,
   onProgress?: (ratio: number) => void,
 ): Promise<number> {
-  const haveWebp = (await listFiles(webpDir, "*.webp")).length > 0;
-  const haveHd = (await listFiles(hdDir, "*.jpg")).length > 0;
-  if (haveWebp && haveHd) return (await listFiles(webpDir, "*.webp")).length;
+  const webpDone = isCompletePass(await stemsOf(webpDir, ".webp"));
+  const hdDone = isCompletePass(await stemsOf(hdDir, ".jpg"));
+  if (webpDone && hdDone) return (await listFiles(webpDir, "*.webp")).length;
 
   const opt = signal ? { signal } : {};
   // 两趟 ffmpeg：webp 占进度前半 [0,0.5]，hd 占后半 [0.5,1]，各按 out_time/时长细分。
