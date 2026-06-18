@@ -48,6 +48,17 @@ function ckCancel(signal?: AbortSignal): void {
   if (signal?.aborted) throw new Error("任务已取消");
 }
 
+/** runToGrids 实际推进的步骤顺序，用于把单步进度折算成整条流水线的总进度 0..1。 */
+const GRID_STEPS: StepProgress["step"][] = ["download", "frames", "dedup", "grids"];
+
+/** 整体进度 = (步索引 + 步内细分 sub) / 步数；sub 省略时落在该步起点。 */
+export function overallRatio(step: StepProgress["step"], sub?: number): number | undefined {
+  const i = GRID_STEPS.indexOf(step);
+  if (i < 0) return undefined;
+  const within = Math.min(Math.max(sub ?? 0, 0), 1);
+  return (i + within) / GRID_STEPS.length;
+}
+
 async function listWebpStems(webpDir: string): Promise<string[]> {
   const stems: string[] = [];
   for await (const entry of glob("*.webp", { cwd: webpDir })) {
@@ -59,7 +70,10 @@ async function listWebpStems(webpDir: string): Promise<string[]> {
 /** 跑 M2→M6（下载→抽帧→去重→宫格），停在"喂 AI 之前"。幂等。 */
 export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Promise<GridsResult> {
   const threshold = params.dedupThreshold ?? DEFAULTS.dedupThreshold;
-  const emit = (step: StepProgress["step"], message: string) => hooks.onStep?.({ step, message });
+  const emit = (step: StepProgress["step"], message: string, sub?: number) => {
+    const ratio = overallRatio(step, sub);
+    return hooks.onStep?.({ step, message, ...(ratio != null ? { ratio } : {}) });
+  };
 
   ckCancel(hooks.signal);
   await emit("download", "取视频信息…");
@@ -68,12 +82,18 @@ export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Prom
   await hooks.onInfo?.({ workDir: td.root, videoTitle: title });
 
   ckCancel(hooks.signal);
-  await emit("download", `下载 (<=${params.quality}p)…`);
-  const { mp4 } = await download(params.url, td.source, params.quality, hooks.browser, hooks.cookiesFile, hooks.signal);
+  await emit("download", `下载 (<=${params.quality}p)…`, 0);
+  const { mp4 } = await download(
+    params.url, td.source, params.quality, hooks.browser, hooks.cookiesFile, hooks.signal,
+    (r) => void emit("download", `下载 (<=${params.quality}p)… ${Math.round(r * 100)}%`, r),
+  );
 
   ckCancel(hooks.signal);
-  await emit("frames", "抽帧 (fps=1 → webp 640x360+水印 / hd 1280x720)…");
-  const frames = await generateFrames(mp4, td.webp, td.hd, hooks.signal);
+  await emit("frames", "抽帧 (fps=1 → webp 640x360+水印 / hd 1280x720)…", 0);
+  const frames = await generateFrames(
+    mp4, td.webp, td.hd, hooks.signal,
+    (r) => void emit("frames", `抽帧 (fps=1 → webp / hd)… ${Math.round(r * 100)}%`, r),
+  );
 
   ckCancel(hooks.signal);
   let kept: string[];

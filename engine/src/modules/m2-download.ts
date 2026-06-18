@@ -74,6 +74,8 @@ export function buildDownloadArgs(
     "--no-playlist",
     "-f", `bv*[height<=${quality}]+ba/b[height<=${quality}]`,
     "--merge-output-format", "mp4",
+    // 进度每条单独成行（而非用 \r 覆盖），便于逐行解析百分比。
+    "--newline",
     "-o", path.join(sourceDir, OUTPUT_TEMPLATE),
   ];
   pushCookieArgs(args, browser, cookiesFile);
@@ -105,6 +107,22 @@ export function buildSubsArgs(
   pushCookieArgs(args, browser, cookiesFile);
   args.push(url);
   return args;
+}
+
+/**
+ * 从 yt-dlp 输出里解析最近一条下载百分比，返回 0..1；无匹配返回 null。
+ * 匹配形如 `[download]  12.3% of ...`。视频/音频分轨下载会各自从 0 走到 100，
+ * 单调处理交给调用方（download 内取 max，避免分轨切换时进度回跳）。
+ */
+export function parseDownloadRatio(chunk: string): number | null {
+  let last: number | null = null;
+  const re = /\[download\]\s+([\d.]+)%/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(chunk)) !== null) {
+    const pct = Number(m[1]);
+    if (Number.isFinite(pct)) last = Math.min(Math.max(pct / 100, 0), 1);
+  }
+  return last;
 }
 
 export interface DownloadOutputs {
@@ -146,12 +164,26 @@ export async function download(
   browser?: string,
   cookiesFile?: string,
   signal?: AbortSignal,
+  onProgress?: (ratio: number) => void,
 ): Promise<DownloadOutputs> {
   const existing = await listFiles(sourceDir, "*.mp4");
   if (existing.length === 0) {
+    // 单调：分轨（视频→音频）各自 0→100，取最大值避免进度条回跳。
+    let maxRatio = 0;
     await runCmd(buildDownloadArgs(url, sourceDir, quality, browser, cookiesFile), {
       timeoutMs: 3_600_000,
       ...(signal ? { signal } : {}),
+      ...(onProgress
+        ? {
+            onStdout: (chunk) => {
+              const r = parseDownloadRatio(chunk);
+              if (r != null && r > maxRatio) {
+                maxRatio = r;
+                onProgress(r);
+              }
+            },
+          }
+        : {}),
     });
   }
   // 字幕仅次要：429/无字幕等失败只记日志，不阻断流水线（srt 允许为 null）。

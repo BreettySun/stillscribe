@@ -14,6 +14,10 @@ export interface RunOptions {
   timeoutMs?: number;
   /** 取消信号；abort 时 SIGKILL 子进程并 reject。 */
   signal?: AbortSignal;
+  /** 实时回调每段 stdout（用于解析进度，如 yt-dlp/ffmpeg -progress）；不影响最终缓冲返回。 */
+  onStdout?(chunk: string): void;
+  /** 实时回调每段 stderr（ffmpeg 进度走 stderr）。 */
+  onStderr?(chunk: string): void;
 }
 
 /**
@@ -52,8 +56,16 @@ export function runCmd(args: string[], opts: RunOptions = {}): Promise<RunResult
       }, opts.timeoutMs);
     }
 
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.stdout.on("data", (d) => {
+      const s = d.toString();
+      stdout += s;
+      opts.onStdout?.(s);
+    });
+    child.stderr.on("data", (d) => {
+      const s = d.toString();
+      stderr += s;
+      opts.onStderr?.(s);
+    });
 
     child.on("error", (err) => {
       cleanup();

@@ -24,6 +24,8 @@ export function buildWebpArgs(video: string, outDir: string): string[] {
     "-vf", `fps=1,scale=640:360,${DRAWTEXT}`,
     "-c:v", "libwebp", "-q:v", "80",
     "-frame_pts", "1",
+    // 机器可读进度写 stdout，供解析；不影响产物。
+    "-progress", "pipe:1",
     path.join(outDir, "%d.webp"),
   ];
 }
@@ -34,8 +36,40 @@ export function buildHdArgs(video: string, outDir: string): string[] {
     "-vf", "fps=1,scale=1280:720",
     "-q:v", "2",
     "-frame_pts", "1",
+    "-progress", "pipe:1",
     path.join(outDir, "%d.jpg"),
   ];
+}
+
+/**
+ * 解析 ffmpeg `-progress` 输出里最近的 out_time（已处理秒数），返回秒；无匹配返回 null。
+ * 形如 `out_time=00:01:23.000000`。
+ */
+export function parseFfmpegOutTimeSeconds(chunk: string): number | null {
+  let last: number | null = null;
+  const re = /out_time=(\d+):(\d+):(\d+(?:\.\d+)?)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(chunk)) !== null) {
+    const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+    if (Number.isFinite(sec)) last = sec;
+  }
+  return last;
+}
+
+/** ffprobe 取视频时长（秒）；失败返回 null（不致命，仅退化为无细分进度）。 */
+async function probeDurationSeconds(video: string): Promise<number | null> {
+  try {
+    const { stdout } = await runCmd([
+      toolPath("ffprobe"), "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=nokey=1:noprint_wrappers=1",
+      video,
+    ], { timeoutMs: 30_000 });
+    const d = Number(stdout.trim());
+    return Number.isFinite(d) && d > 0 ? d : null;
+  } catch {
+    return null;
+  }
 }
 
 async function listFiles(dir: string, pattern: string): Promise<string[]> {
@@ -65,15 +99,34 @@ export async function generateFrames(
   webpDir: string,
   hdDir: string,
   signal?: AbortSignal,
+  onProgress?: (ratio: number) => void,
 ): Promise<number> {
   const haveWebp = (await listFiles(webpDir, "*.webp")).length > 0;
   const haveHd = (await listFiles(hdDir, "*.jpg")).length > 0;
   if (haveWebp && haveHd) return (await listFiles(webpDir, "*.webp")).length;
 
   const opt = signal ? { signal } : {};
-  await runCmd(buildWebpArgs(video, webpDir), { timeoutMs: 7_200_000, ...opt });
+  // 两趟 ffmpeg：webp 占进度前半 [0,0.5]，hd 占后半 [0.5,1]，各按 out_time/时长细分。
+  const duration = onProgress ? await probeDurationSeconds(video) : null;
+  const passProgress = (base: number, span: number) =>
+    onProgress && duration
+      ? {
+          onStdout: (chunk: string) => {
+            const sec = parseFfmpegOutTimeSeconds(chunk);
+            if (sec != null) {
+              onProgress(base + span * Math.min(Math.max(sec / duration, 0), 1));
+            }
+          },
+        }
+      : {};
+
+  await runCmd(buildWebpArgs(video, webpDir), {
+    timeoutMs: 7_200_000, ...opt, ...passProgress(0, 0.5),
+  });
   await renameToHhmmss(webpDir, ".webp");
-  await runCmd(buildHdArgs(video, hdDir), { timeoutMs: 7_200_000, ...opt });
+  await runCmd(buildHdArgs(video, hdDir), {
+    timeoutMs: 7_200_000, ...opt, ...passProgress(0.5, 0.5),
+  });
   await renameToHhmmss(hdDir, ".jpg");
   return (await listFiles(webpDir, "*.webp")).length;
 }

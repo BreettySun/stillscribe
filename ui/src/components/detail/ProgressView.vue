@@ -45,9 +45,10 @@ const ratio = computed(() => progress.value?.ratio);
 
 		<div>
 			<n-progress
+				processing
 				type="line"
+				status="success"
 				:percentage="ratio != null ? Math.round(ratio * 100) : 0"
-				:processing="ratio == null"
 				:indicator-placement="'inside'" />
 			<p
 				v-if="progress?.message"
