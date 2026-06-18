@@ -5,8 +5,8 @@
  * 边界：runToGrids 跑到"喂 AI 之前"（M2→M6）；runDocx 单独做 M8。
  * 这条缝正好是半自动(semi)的 awaiting_review 停顿点——grids 出来后等人工回填 article，再 export 出 docx。
  *
- * 取消：在每步之间检查 signal（粗粒度）。注：模块内单条长命令（如 download/抽帧）暂不被中途打断，
- * 仅在步与步之间响应取消——首版够用，模块级 signal 透传留待后续。
+ * 取消：步与步之间用 ckCancel 检查 signal；同时把 signal 透传进模块（download/抽帧等），
+ * 让长命令在中途收到 abort 即 SIGKILL 子进程立即中断，而非等命令跑完才响应。
  */
 import { mkdirSync } from "node:fs";
 import { glob } from "node:fs/promises";
@@ -63,17 +63,17 @@ export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Prom
 
   ckCancel(hooks.signal);
   await emit("download", "取视频信息…");
-  const { videoId, title } = await fetchVideoInfo(params.url, hooks.browser, hooks.cookiesFile);
+  const { videoId, title } = await fetchVideoInfo(params.url, hooks.browser, hooks.cookiesFile, hooks.signal);
   const td = TaskDir.create(hooks.workRoot, videoId, title);
   await hooks.onInfo?.({ workDir: td.root, videoTitle: title });
 
   ckCancel(hooks.signal);
   await emit("download", `下载 (<=${params.quality}p)…`);
-  const { mp4 } = await download(params.url, td.source, params.quality, hooks.browser, hooks.cookiesFile);
+  const { mp4 } = await download(params.url, td.source, params.quality, hooks.browser, hooks.cookiesFile, hooks.signal);
 
   ckCancel(hooks.signal);
   await emit("frames", "抽帧 (fps=1 → webp 640x360+水印 / hd 1280x720)…");
-  const frames = await generateFrames(mp4, td.webp, td.hd);
+  const frames = await generateFrames(mp4, td.webp, td.hd, hooks.signal);
 
   ckCancel(hooks.signal);
   let kept: string[];

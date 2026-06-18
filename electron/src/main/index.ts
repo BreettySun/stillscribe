@@ -223,6 +223,11 @@ ipcMain.handle("diggo:refresh-cookies", (_e, browser: unknown) =>
 );
 
 app.whenReady().then(async () => {
+	// 开发期 Dock 图标（打包后由 electron-builder 的 build/icon.icns 接管，P4）。
+	if (process.platform === "darwin") {
+		app.dock?.setIcon(path.join(REPO_ROOT, "build", "icon.png"));
+	}
+
 	enginePort = await getFreePort();
 	const origin = `http://127.0.0.1:${enginePort}`;
 	// 开发态：与 `pnpm dev:engine` 共用 engine/work（同一个 tasks.db，队列互通）。

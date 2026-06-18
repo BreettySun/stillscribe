@@ -64,14 +64,16 @@ export async function generateFrames(
   video: string,
   webpDir: string,
   hdDir: string,
+  signal?: AbortSignal,
 ): Promise<number> {
   const haveWebp = (await listFiles(webpDir, "*.webp")).length > 0;
   const haveHd = (await listFiles(hdDir, "*.jpg")).length > 0;
   if (haveWebp && haveHd) return (await listFiles(webpDir, "*.webp")).length;
 
-  await runCmd(buildWebpArgs(video, webpDir), { timeoutMs: 7_200_000 });
+  const opt = signal ? { signal } : {};
+  await runCmd(buildWebpArgs(video, webpDir), { timeoutMs: 7_200_000, ...opt });
   await renameToHhmmss(webpDir, ".webp");
-  await runCmd(buildHdArgs(video, hdDir), { timeoutMs: 7_200_000 });
+  await runCmd(buildHdArgs(video, hdDir), { timeoutMs: 7_200_000, ...opt });
   await renameToHhmmss(hdDir, ".jpg");
   return (await listFiles(webpDir, "*.webp")).length;
 }

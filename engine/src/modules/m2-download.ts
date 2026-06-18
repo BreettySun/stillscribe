@@ -47,8 +47,12 @@ export async function fetchVideoInfo(
   url: string,
   browser?: string,
   cookiesFile?: string,
+  signal?: AbortSignal,
 ): Promise<VideoInfo> {
-  const { stdout } = await runCmd(buildInfoArgs(url, browser, cookiesFile), { timeoutMs: 120_000 });
+  const { stdout } = await runCmd(buildInfoArgs(url, browser, cookiesFile), {
+    timeoutMs: 120_000,
+    ...(signal ? { signal } : {}),
+  });
   const line = stdout.trim();
   const tab = line.indexOf("\t");
   if (tab < 0) throw new Error(`yt-dlp 信息输出异常: ${JSON.stringify(line)}`);
@@ -141,17 +145,22 @@ export async function download(
   quality: VideoQuality = 1080,
   browser?: string,
   cookiesFile?: string,
+  signal?: AbortSignal,
 ): Promise<DownloadOutputs> {
   const existing = await listFiles(sourceDir, "*.mp4");
   if (existing.length === 0) {
     await runCmd(buildDownloadArgs(url, sourceDir, quality, browser, cookiesFile), {
       timeoutMs: 3_600_000,
+      ...(signal ? { signal } : {}),
     });
   }
   // 字幕仅次要：429/无字幕等失败只记日志，不阻断流水线（srt 允许为 null）。
   if ((await listFiles(sourceDir, "*.srt")).length === 0) {
     try {
-      await runCmd(buildSubsArgs(url, sourceDir, browser, cookiesFile), { timeoutMs: 300_000 });
+      await runCmd(buildSubsArgs(url, sourceDir, browser, cookiesFile), {
+        timeoutMs: 300_000,
+        ...(signal ? { signal } : {}),
+      });
     } catch (err) {
       process.stderr.write(
         `[m2] 字幕获取失败（不影响视频/继续流水线）：${err instanceof Error ? err.message : String(err)}\n`,
