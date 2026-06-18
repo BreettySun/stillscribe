@@ -46,6 +46,14 @@ const TOOLS: ToolSpec[] = [
 		url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.06.09/yt-dlp_macos",
 		sha256: "b82c3626952e6c14eaf654cc565866775ffd0b9ffb7021628ac59b42c2f4f244",
 	},
+	{
+		// deno：yt-dlp 解 YouTube nsig 的 JS 运行时（缺它只剩图片格式，无法下载视频）。
+		// 打包后 PATH 被精简，yt-dlp 找不到 PATH 里的 deno，故必须内置并 --js-runtimes 显式指路。
+		name: "deno",
+		url: "https://github.com/denoland/deno/releases/download/v2.8.3/deno-aarch64-apple-darwin.zip",
+		sha256: "88b350be928fdba0e5d8142ff7c101a17133426371e3cf5ed0e0f74e62476f6c",
+		zipEntry: "deno",
+	},
 ];
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));

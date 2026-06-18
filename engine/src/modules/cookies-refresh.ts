@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { toolPath } from "../cli/tools.ts";
+import { toolPath, jsRuntimeArgs } from "../cli/tools.ts";
 import { runCmd } from "../cli/shell.ts";
 import { cookiesPath } from "../paths.ts";
 import { filterYouTube } from "./cookies-filter.ts";
@@ -33,6 +33,7 @@ export async function refreshCookies(opts: RefreshCookiesOptions): Promise<{ kep
     await runCmd(
       [
         toolPath("yt-dlp"),
+        ...jsRuntimeArgs(),
         "--cookies-from-browser", opts.browser,
         "--cookies", tmp,
         "--skip-download",

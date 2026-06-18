@@ -9,10 +9,9 @@
  * 让长命令在中途收到 abort 即 SIGKILL 子进程立即中断，而非等命令跑完才响应。
  */
 import { mkdirSync } from "node:fs";
-import { glob } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULTS, type Article, type StepProgress, type TaskParams } from "@shared/types";
-import { TaskDir } from "../paths.ts";
+import { TaskDir, matchFiles } from "../paths.ts";
 import { fetchVideoInfo, download } from "../modules/m2-download.ts";
 import { generateFrames } from "../modules/m3-frames.ts";
 import { selectRepresentatives, writeManifest } from "../modules/m5-select.ts";
@@ -60,11 +59,8 @@ export function overallRatio(step: StepProgress["step"], sub?: number): number |
 }
 
 async function listWebpStems(webpDir: string): Promise<string[]> {
-  const stems: string[] = [];
-  for await (const entry of glob("*.webp", { cwd: webpDir })) {
-    stems.push(entry.slice(0, -".webp".length));
-  }
-  return stems.sort();
+  const webps = await matchFiles(webpDir, "*.webp");
+  return webps.map((e) => e.slice(0, -".webp".length)).sort();
 }
 
 /** 跑 M2→M6（下载→抽帧→去重→宫格），停在"喂 AI 之前"。幂等。 */

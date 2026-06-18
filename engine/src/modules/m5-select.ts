@@ -5,9 +5,10 @@
  * 贪心顺序保留：与上一张【已保留】的代表帧汉明距离 >= threshold 才保留。
  * threshold=0 ⇒ 任何距离都 >=0 ⇒ 保留全部；阈值越大保留越少。
  */
-import { glob, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { phash, hamming } from "./m5-phash.ts";
+import { matchFiles } from "../paths.ts";
 
 /** 代表帧清单文件结构（内部产物，非前后端契约）。 */
 export interface RepresentativesManifest {
@@ -17,11 +18,8 @@ export interface RepresentativesManifest {
 }
 
 async function listStems(webpDir: string): Promise<string[]> {
-  const stems: string[] = [];
-  for await (const entry of glob("*.webp", { cwd: webpDir })) {
-    stems.push(entry.slice(0, -".webp".length));
-  }
-  return stems.sort();
+  const webps = await matchFiles(webpDir, "*.webp");
+  return webps.map((e) => e.slice(0, -".webp".length)).sort();
 }
 
 /** 返回保留帧名列表（HH_MM_SS，按时间序）。 */

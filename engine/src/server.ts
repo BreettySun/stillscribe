@@ -6,7 +6,6 @@
  */
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { glob } from "node:fs/promises";
 import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
@@ -24,7 +23,7 @@ import {
 	type UISettings,
 	UI_DEFAULTS,
 } from "@shared/types";
-import { TaskDir } from "./paths.ts";
+import { TaskDir, matchFiles } from "./paths.ts";
 import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
@@ -105,13 +104,7 @@ export function resolveWithin(dir: string, file: string): string | null {
 }
 
 async function listByExt(dir: string, ext: string): Promise<string[]> {
-	const out: string[] = [];
-	try {
-		for await (const entry of glob(`*${ext}`, { cwd: dir })) out.push(entry);
-	} catch {
-		/* 目录不存在 → 空 */
-	}
-	return out.sort();
+	return matchFiles(dir, `*${ext}`);
 }
 
 /** 由 workDir 构造逐秒帧列表（供换图画廊）。 */

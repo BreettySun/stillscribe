@@ -6,11 +6,11 @@
  * - 01_hd:   fps=1 + scale=1280:720 + jpg（换图浏览 + M8 配图源；docx 对 webp 支持不稳，HD 用 jpg）
  * - -frame_pts 1 使输出文件名 = pts 秒数，重命名为 HH_MM_SS 是纯算术映射
  */
-import { glob, rename } from "node:fs/promises";
+import { rename } from "node:fs/promises";
 import path from "node:path";
 import { toolPath } from "../cli/tools.ts";
 import { runCmd } from "../cli/shell.ts";
-import { secondsToName } from "../paths.ts";
+import { secondsToName, matchFiles } from "../paths.ts";
 
 // %{pts\:hms} 展开为 HH:MM:SS.mmm；fps=1 下毫秒恒为 000
 const DRAWTEXT =
@@ -73,9 +73,7 @@ async function probeDurationSeconds(video: string): Promise<number | null> {
 }
 
 async function listFiles(dir: string, pattern: string): Promise<string[]> {
-  const out: string[] = [];
-  for await (const entry of glob(pattern, { cwd: dir })) out.push(entry);
-  return out;
+  return matchFiles(dir, pattern);
 }
 
 /** 把 ffmpeg 产出的 `<秒数>.ext` 重命名为 `HH_MM_SS.ext`。返回重命名数量。 */

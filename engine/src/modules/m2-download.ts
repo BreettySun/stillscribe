@@ -9,11 +9,11 @@
  * 字幕语言用精确白名单而非 `en.*` 通配——通配会命中 YouTube 自动翻译轨（en-sl/en-fr… 上百条），
  * 逐条下载极易触发 HTTP 429。缺字幕时 M7 仍可工作（srt 允许为 null）。
  */
-import { glob } from "node:fs/promises";
 import path from "node:path";
 import type { VideoQuality } from "@shared/types";
-import { toolPath } from "../cli/tools.ts";
+import { toolPath, jsRuntimeArgs } from "../cli/tools.ts";
 import { runCmd } from "../cli/shell.ts";
+import { matchFiles } from "../paths.ts";
 
 /** 取信息（不下载），用于建任务目录前拿到 id + title。 */
 /**
@@ -29,6 +29,7 @@ function pushCookieArgs(args: string[], browser?: string, cookiesFile?: string):
 export function buildInfoArgs(url: string, browser?: string, cookiesFile?: string): string[] {
   const args = [
     toolPath("yt-dlp"),
+    ...jsRuntimeArgs(),
     "--no-playlist",
     "--print", "%(id)s\t%(title)s",
     "--skip-download",
@@ -71,6 +72,7 @@ export function buildDownloadArgs(
 ): string[] {
   const args = [
     toolPath("yt-dlp"),
+    ...jsRuntimeArgs(),
     "--no-playlist",
     "-f", `bv*[height<=${quality}]+ba/b[height<=${quality}]`,
     "--merge-output-format", "mp4",
@@ -95,6 +97,7 @@ export function buildSubsArgs(
 ): string[] {
   const args = [
     toolPath("yt-dlp"),
+    ...jsRuntimeArgs(),
     "--no-playlist",
     "--skip-download",
     "--write-subs", "--write-auto-subs",
@@ -133,11 +136,7 @@ export interface DownloadOutputs {
 }
 
 async function listFiles(dir: string, pattern: string): Promise<string[]> {
-  const out: string[] = [];
-  for await (const entry of glob(pattern, { cwd: dir })) {
-    out.push(path.join(dir, entry));
-  }
-  return out.sort();
+  return (await matchFiles(dir, pattern)).map((e) => path.join(dir, e)).sort();
 }
 
 /** 在 source/ 找下载产物。srt 优先纯 `.en.srt`（人工/原生轨），en-XX 自动翻译轨次之。 */

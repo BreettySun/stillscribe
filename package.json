@@ -1,5 +1,5 @@
 {
-	"name": "diggo-press",
+	"name": "Diggo Press",
 	"version": "0.1.0",
 	"private": true,
 	"description": "YouTube 视频 → 图文文章 桌面应用（monorepo 根）",
@@ -8,6 +8,7 @@
 		"dev:engine": "pnpm --filter @diggo/engine dev",
 		"dev:ui": "pnpm --filter @diggo/ui dev",
 		"dev:desktop": "pnpm --filter @diggo/desktop dev",
+		"dist": "bash scripts/package-mac.sh",
 		"typecheck": "pnpm --filter @diggo/engine typecheck && pnpm --filter @diggo/ui typecheck && pnpm --filter @diggo/desktop typecheck",
 		"test": "pnpm --filter @diggo/engine test",
 		"refresh-cookies": "pnpm --filter @diggo/engine refresh-cookies"

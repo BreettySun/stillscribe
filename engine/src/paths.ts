@@ -3,6 +3,7 @@
  * 禁止在各处硬编码路径字符串拼接，一律走这里。
  */
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import type { Timestamp } from "@shared/types";
 
@@ -39,6 +40,25 @@ export function resolveCookiesFile(workRoot: string): string | undefined {
       return !t.startsWith("#") || t.startsWith(HTTPONLY);
     });
   return hasCookie ? file : undefined;
+}
+
+/**
+ * 列出 dir 下匹配简单 glob（仅 `*<后缀>` 形式，如 `*.webp`/`*.mp4`）的文件名，相对名、已排序。
+ * 替代 node:fs/promises 的 `glob`——该 API 需 Node 22，而 Electron 33 仅带 Node 20（打包后引擎跑在
+ * Electron 自带 Node 上）。目录不存在按空集处理（与原 glob 在缺失目录抛错后被吞掉的语义一致）。
+ */
+export async function matchFiles(dir: string, pattern: string): Promise<string[]> {
+  if (!pattern.startsWith("*")) {
+    throw new Error(`matchFiles 仅支持 "*后缀" 形式，收到: ${JSON.stringify(pattern)}`);
+  }
+  const suffix = pattern.slice(1);
+  try {
+    const names = await readdir(dir);
+    return names.filter((n) => n.endsWith(suffix)).sort();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
 }
 
 /** 秒数 → "HH_MM_SS"（fps=1 下帧序号即秒数，纯算术映射）。 */

@@ -5,6 +5,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 beforeAll(() => {
   process.env.DIGGO_YT_DLP = process.execPath;
   process.env.DIGGO_FFMPEG = process.execPath;
+  // deno 为可选 JS 运行时（解 nsig）：用 node 自身冒充，使 --js-runtimes 参数确定可断言。
+  process.env.DIGGO_DENO = process.execPath;
 });
 
 const { buildInfoArgs, buildDownloadArgs, buildSubsArgs } = await import("./m2-download.ts");
@@ -14,6 +16,7 @@ describe("M2 yt-dlp arg-builders（与已验证命令逐字对齐）", () => {
   it("buildInfoArgs", () => {
     expect(buildInfoArgs("URL")).toEqual([
       process.execPath,
+      "--js-runtimes", `deno:${process.execPath}`,
       "--no-playlist",
       "--print", "%(id)s\t%(title)s",
       "--skip-download",

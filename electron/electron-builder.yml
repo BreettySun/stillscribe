@@ -1,0 +1,30 @@
+# electron-builder 配置。projectDir = electron/（从 electron/ 运行 `electron-builder`），
+# 故 bin/ 与 build/ 图标在仓库根，用 ../ 引用。
+appId: com.diggo.press
+productName: diggo-press
+# 应用元数据取自 electron/package.json；只打包 electron 子包自身的产物与依赖。
+directories:
+  output: ../release
+  buildResources: ../build
+icon: ../build/icon.icns
+files:
+  - out/**
+  - package.json
+  - "node_modules/**"
+extraResources:
+  # 内置 CLI 二进制 → 运行时 process.resourcesPath/bin（铁律 #1：绝对路径 spawn）。
+  - from: ../bin
+    to: bin
+asarUnpack:
+  # 原生 .node 不能从 asar 内加载；better-sqlite3(V8) 与 sharp(@img, N-API) 均需解包。
+  - "**/*.node"
+  - "node_modules/better-sqlite3/**"
+  - "node_modules/@img/**"
+  - "node_modules/sharp/**"
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  identity: null # 本地未签名构建（首次打开需右键“打开”）
+  category: public.app-category.productivity

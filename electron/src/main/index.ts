@@ -5,7 +5,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
 import { readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -22,16 +22,41 @@ import { filterYouTube } from "@engine/modules/cookies-filter";
 // 运行时 __dirname = electron/out/main → 上溯三级到仓库根。
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 
-/** 工作根（与引擎一致）：开发态用仓库 engine/work，可被 DIGGO_WORK_ROOT 覆盖。 */
+// 包名是 @diggo/desktop，会让 userData 落到 "Application Support/@diggo/desktop"（难看且含斜杠）。
+// 统一显示名，使 userData = "Application Support/diggo-press"。必须在 app ready 前调用。
+app.setName("diggo-press");
+
+/**
+ * 工作根（与引擎一致）：可被 DIGGO_WORK_ROOT 覆盖。
+ * - 打包后：app.getPath("userData")/work（仓库目录不存在/不可写）。
+ * - 开发态：仓库 engine/work（与 `pnpm dev:engine` 共用同一个 tasks.db，队列互通）。
+ */
 function getWorkRoot(): string {
-	return process.env.DIGGO_WORK_ROOT ?? path.join(REPO_ROOT, "engine", "work");
+	if (process.env.DIGGO_WORK_ROOT) return process.env.DIGGO_WORK_ROOT;
+	if (app.isPackaged) return path.join(app.getPath("userData"), "work");
+	return path.join(REPO_ROOT, "engine", "work");
 }
 
-/** yt-dlp 绝对路径（禁止依赖 PATH，铁律 #1）：env 覆盖 > 打包内置 > 仓库 bin/。 */
+/** 内置二进制目录：打包后 process.resourcesPath/bin，开发态仓库 bin/。 */
+function binDir(): string {
+	return app.isPackaged ? path.join(process.resourcesPath, "bin") : path.join(REPO_ROOT, "bin");
+}
+
+/** yt-dlp 绝对路径（禁止依赖 PATH，铁律 #1）：env 覆盖 > 内置 bin/。 */
 function ytDlpPath(): string {
 	if (process.env.DIGGO_YT_DLP) return process.env.DIGGO_YT_DLP;
-	if (app.isPackaged) return path.join(process.resourcesPath, "bin", "yt-dlp");
-	return path.join(REPO_ROOT, "bin", "yt-dlp");
+	return path.join(binDir(), "yt-dlp");
+}
+
+/** deno 绝对路径（yt-dlp 解 YouTube nsig 的 JS 运行时）：env 覆盖 > 内置 bin/。 */
+function denoPath(): string {
+	return process.env.DIGGO_DENO ?? path.join(binDir(), "deno");
+}
+
+/** yt-dlp 的 --js-runtimes 参数；deno 不存在时返回 []（降级）。 */
+function jsRuntimeArgs(): string[] {
+	const deno = denoPath();
+	return existsSync(deno) ? ["--js-runtimes", `deno:${deno}`] : [];
 }
 
 /** spawn 到完成；非 0 退出码 reject（含 stderr 尾部）。 */
@@ -67,6 +92,7 @@ async function refreshCookies(browser: string): Promise<{ kept: number }> {
 	);
 	try {
 		await runYtDlp([
+			...jsRuntimeArgs(),
 			"--cookies-from-browser",
 			browser,
 			"--cookies",
@@ -107,18 +133,34 @@ function getFreePort(): Promise<number> {
 function startEngine(workRoot: string): void {
 	// cookies.txt 不在此注入——引擎按任务即时探测 <workRoot>/cookies.txt（P1 方案 A）：
 	// 跑完 refresh-cookies 无需重启 App 即生效，文件失效时自动回退 --cookies-from-browser。
+	const bin = binDir();
 	const env: NodeJS.ProcessEnv = {
 		...process.env,
 		DIGGO_HOST: "127.0.0.1",
 		DIGGO_PORT: String(enginePort),
 		DIGGO_WORK_ROOT: workRoot,
+		// 引擎绝对路径找 CLI（铁律 #1）：env 优先，打包后指向 resources/bin，引擎保持 Electron-agnostic。
+		DIGGO_YT_DLP: path.join(bin, "yt-dlp"),
+		DIGGO_FFMPEG: path.join(bin, "ffmpeg"),
+		DIGGO_FFPROBE: path.join(bin, "ffprobe"),
+		DIGGO_DENO: path.join(bin, "deno"),
 	};
 
-	engine = spawn("pnpm", ["--filter", "@diggo/engine", "serve"], {
-		cwd: REPO_ROOT,
-		env,
-		stdio: ["ignore", "inherit", "inherit"],
-	});
+	if (app.isPackaged) {
+		// 打包后无 pnpm/tsx/源码：用 Electron 自带 Node 跑 esbuild 打好的引擎单文件。
+		// __dirname = .../Resources/app(.asar)/out/main → 同级 out/engine/serve.cjs。
+		const enginePath = path.join(__dirname, "../engine/serve.cjs");
+		engine = spawn(process.execPath, [enginePath], {
+			env: { ...env, ELECTRON_RUN_AS_NODE: "1" },
+			stdio: ["ignore", "inherit", "inherit"],
+		});
+	} else {
+		engine = spawn("pnpm", ["--filter", "@diggo/engine", "serve"], {
+			cwd: REPO_ROOT,
+			env,
+			stdio: ["ignore", "inherit", "inherit"],
+		});
+	}
 	engine.on("exit", (code, signal) => {
 		engine = null;
 		if (quitting) return;
@@ -224,7 +266,7 @@ ipcMain.handle("diggo:refresh-cookies", (_e, browser: unknown) =>
 
 app.whenReady().then(async () => {
 	// 开发期 Dock 图标（打包后由 electron-builder 的 build/icon.icns 接管，P4）。
-	if (process.platform === "darwin") {
+	if (process.platform === "darwin" && !app.isPackaged) {
 		app.dock?.setIcon(path.join(REPO_ROOT, "build", "icon.png"));
 	}
 
