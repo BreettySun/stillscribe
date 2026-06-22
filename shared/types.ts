@@ -37,9 +37,8 @@ export type GeminiModel = string;
 
 /**
  * 全自动(M7)喂图策略：
- * - "frames"：直接发去重后的代表单帧（AI 集成文档 §7 优先方案，模型看单帧更清楚）。
- * - "grids" ：发宫格图（半自动为绕网页版传图数量限制的老策略）。
- * 走 API 后默认 frames，实测确认上限后再定。
+ * - "grids" ：发宫格图（每张打包 50 帧，请求体/token 成本低一个量级）。【默认】实测 5'30" 视频可行。
+ * - "frames"：发去重后的代表单帧（模型看单帧更清楚，但帧多时图数/体积暴涨，成本高，见 AI 集成文档 §7/§8）。
  */
 export type AIImageSource = "frames" | "grids";
 
@@ -290,7 +289,7 @@ export interface AISettings {
 
 export const AI_DEFAULTS: Omit<AISettings, "hasApiKey"> = {
 	model: "gemini-2.5-flash",
-	imageSource: "frames",
+	imageSource: "grids",
 };
 
 // ============================================================

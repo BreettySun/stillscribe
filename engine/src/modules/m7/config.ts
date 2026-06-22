@@ -19,8 +19,9 @@ export interface ResolvedAIConfig {
 export function resolveAIConfig(): ResolvedAIConfig {
   const apiKey = process.env.DIGGO_GEMINI_API_KEY || undefined;
   const model = process.env.DIGGO_GEMINI_MODEL || AI_DEFAULTS.model;
+  const envSource = process.env.DIGGO_AI_IMAGE_SOURCE;
   const imageSource: AIImageSource =
-    process.env.DIGGO_AI_IMAGE_SOURCE === "grids" ? "grids" : AI_DEFAULTS.imageSource;
+    envSource === "grids" || envSource === "frames" ? envSource : AI_DEFAULTS.imageSource;
   return { apiKey, model, imageSource };
 }
 
