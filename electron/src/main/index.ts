@@ -18,6 +18,7 @@ import {
 	shell,
 } from "electron";
 import { filterYouTube } from "@engine/modules/cookies-filter";
+import { resolveGeminiKey } from "./apiKey";
 
 // 运行时 __dirname = electron/out/main → 上溯三级到仓库根。
 const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -115,6 +116,8 @@ let enginePort = 0;
 let quitting = false;
 let restarts = 0;
 const MAX_RESTARTS = 5;
+// 打包后注入引擎的 Gemini Key（safeStorage 解密，app ready 后解析一次；重启复用）。dev 下为 undefined。
+let geminiKey: string | undefined;
 
 /** 让系统分配一个空闲端口（避免与单独运行的引擎 8787 冲突）。 */
 function getFreePort(): Promise<number> {
@@ -144,6 +147,8 @@ function startEngine(workRoot: string): void {
 		DIGGO_FFMPEG: path.join(bin, "ffmpeg"),
 		DIGGO_FFPROBE: path.join(bin, "ffprobe"),
 		DIGGO_DENO: path.join(bin, "deno"),
+		// 打包后 M7 全自动用的 Gemini Key（safeStorage 解密）；dev 下 undefined，引擎自读 engine/.env。
+		...(geminiKey ? { DIGGO_GEMINI_API_KEY: geminiKey } : {}),
 	};
 
 	if (app.isPackaged) {
@@ -269,6 +274,9 @@ app.whenReady().then(async () => {
 	if (process.platform === "darwin" && !app.isPackaged) {
 		app.dock?.setIcon(path.join(REPO_ROOT, "build", "icon.png"));
 	}
+
+	// safeStorage 须 app ready 后用：解析一次 Key，spawn 引擎时经 env 注入（打包后才有；dev 为 undefined）。
+	geminiKey = resolveGeminiKey();
 
 	enginePort = await getFreePort();
 	const origin = `http://127.0.0.1:${enginePort}`;

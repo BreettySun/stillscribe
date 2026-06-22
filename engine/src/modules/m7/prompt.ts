@@ -15,8 +15,14 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-/** 真·Prompt 落盘点：存在即覆盖占位模板。 */
+/** 真·Prompt 落盘点：存在即覆盖占位模板（dev 下读源文件）。 */
 export const PROMPT_TEMPLATE_FILE = path.join(here, "prompt.template.txt");
+
+/**
+ * 打包时由 esbuild define 注入的真模板常量（见 electron/scripts/build-engine.mjs）。
+ * dev/tsx 下该标识符不存在——`typeof` 守卫保证不抛错（返回 "undefined"），从而回退到读源 .txt。
+ */
+declare const __DIGGO_PROMPT_TEMPLATE__: string | undefined;
 
 export interface PromptVars {
   /** 视频标题。 */
@@ -37,11 +43,22 @@ const PLACEHOLDER_TEMPLATE = `【占位提示词 — 待录入既有半自动同
 - 任何中文说明 / 配图理由 / 框架取舍，只能放进 notes 字段。
 - meta 给出候选标题(titles)、关键词(keywords)、摘要(description)。`;
 
-/** 渲染提示词：优先 prompt.template.txt，缺失则用占位模板；支持 {{var}} 占位替换。 */
+/**
+ * 渲染提示词。取模板优先级：
+ *   1) 打包时烤入的 __DIGGO_PROMPT_TEMPLATE__（packaged）；
+ *   2) 源 prompt.template.txt（dev，单一事实来源）；
+ *   3) 占位模板（都没有时兜底）。
+ * 支持 {{var}} 占位替换。
+ */
 export async function renderPrompt(vars: PromptVars): Promise<string> {
-  const tpl = existsSync(PROMPT_TEMPLATE_FILE)
-    ? await readFile(PROMPT_TEMPLATE_FILE, "utf-8")
-    : PLACEHOLDER_TEMPLATE;
+  let tpl: string;
+  if (typeof __DIGGO_PROMPT_TEMPLATE__ === "string" && __DIGGO_PROMPT_TEMPLATE__) {
+    tpl = __DIGGO_PROMPT_TEMPLATE__;
+  } else if (existsSync(PROMPT_TEMPLATE_FILE)) {
+    tpl = await readFile(PROMPT_TEMPLATE_FILE, "utf-8");
+  } else {
+    tpl = PLACEHOLDER_TEMPLATE;
+  }
   const dict = vars as unknown as Record<string, unknown>;
   return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => {
     const v = dict[k];

@@ -8,11 +8,19 @@
  */
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // electron/scripts
 const electronRoot = path.resolve(here, "..");
 const repoRoot = path.resolve(electronRoot, "..");
+
+// 把 M7 真模板烤进 bundle：打包后 import.meta.url 解析到 out/engine，且 ELECTRON_RUN_AS_NODE
+// 下从 asar 读文件不可靠——直接以 esbuild define 注入字符串常量，prompt.ts 优先用它（dev 仍读源 .txt）。
+const promptTemplateText = readFileSync(
+  path.join(repoRoot, "engine", "src", "modules", "m7", "prompt.template.txt"),
+  "utf-8",
+);
 
 await build({
   entryPoints: [path.join(repoRoot, "engine", "src", "serve.ts")],
@@ -29,7 +37,11 @@ await build({
   alias: { "@shared": path.join(repoRoot, "shared") },
   // CJS 下 import.meta.url 为空 → tools.ts 顶层 fileURLToPath(import.meta.url) 会抛错。
   // 用 __filename 还原其值（esbuild 标准配方：define 把 token 换成标识符，banner 定义该标识符）。
-  define: { "import.meta.url": "import_meta_url" },
+  define: {
+    "import.meta.url": "import_meta_url",
+    // M7 真模板烤入：prompt.ts 内 `typeof __DIGGO_PROMPT_TEMPLATE__` guard 在打包后取到此常量。
+    __DIGGO_PROMPT_TEMPLATE__: JSON.stringify(promptTemplateText),
+  },
   banner: {
     js: "const import_meta_url = require('url').pathToFileURL(__filename).href;",
   },
@@ -37,4 +49,6 @@ await build({
   logLevel: "info",
 });
 
-console.log("✅ 引擎已打包: electron/out/engine/serve.cjs");
+console.log(
+  `✅ 引擎已打包: electron/out/engine/serve.cjs（已烤入 Prompt 模板 ${promptTemplateText.length} 字）`,
+);
