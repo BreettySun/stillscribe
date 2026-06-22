@@ -13,11 +13,23 @@ export interface AdvancedModel {
 
 const model = defineModel<AdvancedModel>({ required: true });
 
+const props = withDefaults(defineProps<{ aiHasKey?: boolean }>(), {
+	aiHasKey: false,
+});
+
 const qualityOptions = [
 	{ label: "1080p", value: 1080 },
 	{ label: "1440p", value: 1440 },
 ];
-const modeOptions = [{ label: "semi（半自动回填）", value: "semi" }];
+// auto 需引擎侧配好 Gemini Key（engine/.env）才可选；未配置时禁用并提示。
+const modeOptions = computed(() => [
+	{
+		label: "Auto（全自动）",
+		value: "auto",
+		disabled: !props.aiHasKey,
+	},
+	{ label: "Semi（半自动回填）", value: "semi" },
+]);
 
 const summaryTags = computed(() => {
 	const m = model.value;

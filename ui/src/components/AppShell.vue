@@ -158,7 +158,8 @@ onUnmounted(() => disconnect?.());
 		<n-split
 			:default-size="'360px'"
 			:max="0.5"
-			:min="'300px'">
+			:min="'300px'"
+			class="app-split">
 			<template #1>
 				<QueuePanel class="app-queue" />
 			</template>
@@ -203,7 +204,7 @@ onUnmounted(() => disconnect?.());
 	height: 9px;
 	border-radius: 50%;
 }
-.app-body {
+.app-split {
 	flex: 1;
 	display: flex;
 	min-height: 0;
@@ -214,9 +215,10 @@ onUnmounted(() => disconnect?.());
 	min-height: 0;
 }
 .app-context {
-	flex: 1;
+	/* pane-2 是 overflow:hidden 的 block（非 flex），故 flex:1 在此无效；
+	   必须给确定高度，overflow:auto 才有 clientHeight 上限、内容超出时才滚动。 */
+	height: 100%;
 	min-width: 0;
-	min-height: 0;
 	overflow: auto;
 }
 </style>

@@ -3,6 +3,7 @@
  * DTO 全部来自 @shared/types（唯一契约，禁止影子结构 —— CLAUDE.md 铁律 #3）。
  */
 import type {
+	AISettings,
 	Article,
 	BatchSubmit,
 	ExportResult,
@@ -77,6 +78,9 @@ export const api = {
 			headers: JSON_HEADERS,
 			body: JSON.stringify(patch),
 		}).then(parse<UISettings>),
+
+	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
+	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
 
 	listGrids: (id: string) =>
 		fetch(`${BASE}/tasks/${id}/grids`).then(parse<GridList>),

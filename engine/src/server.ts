@@ -58,10 +58,7 @@ const COOKIE_BROWSERS: readonly CookieBrowser[] = [
 	"chrome",
 	"edge",
 	"firefox",
-	"brave",
-	"chromium",
 	"opera",
-	"vivaldi",
 ];
 
 /** 把不可信输入规整成 TaskParams 并填默认值；url 缺失抛 400，browser 非法抛 400。 */
