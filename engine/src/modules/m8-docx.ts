@@ -9,12 +9,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  Document,
-  Packer,
-  Paragraph,
-  ImageRun,
-  HeadingLevel,
-  AlignmentType,
+	Document,
+	Packer,
+	Paragraph,
+	ImageRun,
+	HeadingLevel,
+	AlignmentType,
 } from "docx";
 import type { Article } from "@shared/types";
 
@@ -24,65 +24,69 @@ const IMG_H = 324;
 
 /** 正文按空行切段、去空白段（纯函数，便于单测）。 */
 export function bodyToParagraphTexts(body: string): string[] {
-  return body
-    .split("\n\n")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+	return body
+		.split("\n\n")
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
 }
 
 async function readImageIfExists(p: string): Promise<Buffer | null> {
-  try {
-    return await readFile(p);
-  } catch {
-    return null;
-  }
+	try {
+		return await readFile(p);
+	} catch {
+		return null;
+	}
 }
 
 /** 生成 docx。返回 warnings（缺图清单）。 */
 export async function buildDocx(
-  article: Article,
-  hdDir: string,
-  outPath: string,
+	article: Article,
+	hdDir: string,
+	outPath: string,
 ): Promise<string[]> {
-  const warnings: string[] = [];
-  const children: Paragraph[] = [];
+	const warnings: string[] = [];
+	const children: Paragraph[] = [];
 
-  for (const page of article.pages) {
-    children.push(
-      new Paragraph({ heading: HeadingLevel.HEADING_2, text: page.subhead }),
-    );
+	for (const page of article.pages) {
+		children.push(
+			new Paragraph({ heading: HeadingLevel.HEADING_4, text: page.subhead }),
+		);
 
-    const imgPath = path.join(hdDir, `${page.image}.jpg`);
-    const data = await readImageIfExists(imgPath);
-    if (data) {
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new ImageRun({
-              type: "jpg",
-              data,
-              transformation: { width: IMG_W, height: IMG_H },
-            }),
-          ],
-        }),
-      );
-    } else {
-      warnings.push(`配图缺失，已跳过: ${page.image}（页 "${page.subhead}"）`);
-    }
+		const imgPath = path.join(hdDir, `${page.image}.jpg`);
+		const data = await readImageIfExists(imgPath);
+		if (data) {
+			children.push(
+				new Paragraph({
+					alignment: AlignmentType.CENTER,
+					children: [
+						new ImageRun({
+							type: "jpg",
+							data,
+							transformation: { width: IMG_W, height: IMG_H },
+						}),
+					],
+				}),
+			);
+		} else {
+			warnings.push(`配图缺失，已跳过: ${page.image}（页 "${page.subhead}"）`);
+		}
 
-    for (const text of bodyToParagraphTexts(page.body)) {
-      children.push(new Paragraph({ text }));
-    }
-  }
+		for (const text of bodyToParagraphTexts(page.body)) {
+			children.push(new Paragraph({ text }));
+		}
+	}
 
-  const { meta } = article;
-  children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, text: "Meta" }));
-  children.push(new Paragraph({ text: "Titles: " + meta.titles.join(" | ") }));
-  children.push(new Paragraph({ text: "Keywords: " + meta.keywords.join(", ") }));
-  children.push(new Paragraph({ text: "Description: " + meta.description }));
+	const { meta } = article;
+	children.push(
+		new Paragraph({ heading: HeadingLevel.HEADING_4, text: "Meta" }),
+	);
+	children.push(new Paragraph({ text: "Titles: " + meta.titles.join(" | ") }));
+	children.push(
+		new Paragraph({ text: "Keywords: " + meta.keywords.join(", ") }),
+	);
+	children.push(new Paragraph({ text: "Description: " + meta.description }));
 
-  const doc = new Document({ sections: [{ children }] });
-  await writeFile(outPath, await Packer.toBuffer(doc));
-  return warnings;
+	const doc = new Document({ sections: [{ children }] });
+	await writeFile(outPath, await Packer.toBuffer(doc));
+	return warnings;
 }
