@@ -9,11 +9,14 @@
  *         awaiting_review → running(导出 docx) → completed
  *         failed/canceled → queued（重试）
  * 半自动(semi)：runToGrids 完成即停在 awaiting_review，等人工回填 article 后再 exportDocx。
- * auto 模式本版未接 Gemini，同样停在 awaiting_review（待 M7 接入）。
+ * 全自动(auto)：runToGrids 后直接调 Gemini(M7) 生成 article 草稿再进 awaiting_review（仍让人工校对/换图）；
+ *               缺 Key / API 失败则降级——不让任务失败，照样进 awaiting_review 让人工接手（AI 集成文档 §6）。
  */
 import type { SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
 import { TaskDir, resolveCookiesFile } from "../paths.ts";
-import { runToGrids, runDocx } from "./pipeline.ts";
+import { runToGrids, runDocx, runArticle, type GridsResult } from "./pipeline.ts";
+import { resolveAIConfig } from "../modules/m7/config.ts";
+import { createGeminiClient } from "../modules/m7/geminiClient.ts";
 import type { EventBus } from "./events.ts";
 import type { TaskStore } from "../store/tasks.ts";
 
@@ -157,6 +160,36 @@ export class Orchestrator {
 
   // ---- 内部 ----
 
+  /**
+   * M7 全自动：构造 client → 生成 Article → 存库（+落盘 article.json）。
+   * 任何缺配置 / API 失败都【不让任务失败】，只记日志并降级——仍进 awaiting_review 让人工接手（§6）。
+   */
+  private async tryAutoArticle(id: string, grids: GridsResult): Promise<void> {
+    const cfg = resolveAIConfig();
+    if (!cfg.apiKey) {
+      process.stderr.write(`[m7] 未配置 Gemini API Key，降级半自动 (task ${id})\n`);
+      return;
+    }
+    try {
+      const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
+      this.store.update(id, { currentStep: "article" });
+      const { article, warnings } = await runArticle(
+        grids.taskDir,
+        { client, videoTitle: grids.videoTitle, imageSource: cfg.imageSource },
+        (progress) => {
+          this.store.update(id, { currentStep: progress.step });
+          this.bus.emit({ type: "progress", taskId: id, progress });
+        },
+      );
+      for (const w of warnings) process.stderr.write(`[m7][warn] ${w} (task ${id})\n`);
+      this.store.update(id, { article, currentStep: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[m7] 全自动失败，降级半自动 (task ${id}): ${msg}\n`);
+      this.store.update(id, { currentStep: null });
+    }
+  }
+
   private transition(id: string, to: TaskStatus): void {
     const current = this.store.get(id);
     if (current && !canTransition(current.status, to)) {
@@ -190,7 +223,7 @@ export class Orchestrator {
       // 按任务即时探测 cookies.txt（P1 方案 A）：跑完 refresh-cookies 无需重启即生效；
       // 文件缺失/被置空时 cookiesFile=undefined → 自动回退 --cookies-from-browser。
       const cookiesFile = resolveCookiesFile(this.opts.workRoot);
-      await runToGrids(task.params, {
+      const grids = await runToGrids(task.params, {
         workRoot: this.opts.workRoot,
         // 任务级 browser 优先，回退到启动时的全局 DIGGO_BROWSER 默认。
         browser: task.params.browser ?? this.opts.browser,
@@ -206,9 +239,19 @@ export class Orchestrator {
           this.bus.emit({ type: "progress", taskId: id, progress });
         },
       });
-      // semi / 未接 Gemini 的 auto：停在 awaiting_review 等人工回填。
       this.store.update(id, { currentStep: null });
+
+      // auto：直接调 Gemini 生成 article（失败则降级，仍进 awaiting_review）。
+      // semi：跳过，停在 awaiting_review 等人工回填。
+      if (task.params.mode === "auto") {
+        await this.tryAutoArticle(id, grids);
+      }
       this.transition(id, "awaiting_review");
+      // auto 成功后 awaiting_review 携带 article 草稿（契约：semi 此事件无 article）。
+      const after = this.store.get(id);
+      if (after?.article) {
+        this.bus.emit({ type: "awaiting_review", taskId: id, article: after.article });
+      }
     } catch (err) {
       if (ac.signal.aborted) {
         this.transition(id, "canceled");

@@ -27,6 +27,7 @@ import { TaskDir, matchFiles } from "./paths.ts";
 import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
+import { readAISettings } from "./modules/m7/config.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
 import type { EventBus } from "./orchestrator/events.ts";
@@ -272,6 +273,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		}
 		return readUISettings();
 	});
+
+	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
+	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
+	app.get("/settings/ai", () => readAISettings());
 
 	// ---- 静态产物（含路径穿越防护）----
 	const sendImage = async (

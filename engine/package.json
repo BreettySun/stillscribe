@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "setup-tools": "tsx scripts/setup-tools.ts",
-    "refresh-cookies": "tsx scripts/refresh-cookies.ts"
+    "refresh-cookies": "tsx scripts/refresh-cookies.ts",
+    "gemini-smoke": "tsx scripts/gemini-smoke.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
+    "@google/genai": "^1.52.0",
     "better-sqlite3": "^11.8.0",
     "docx": "^9.7.1",
     "fastify": "^5.2.0",

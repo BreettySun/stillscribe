@@ -6,6 +6,7 @@
  */
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { loadDotEnv } from "./env.ts";
 import { resolveWorkRoot } from "./paths.ts";
 import { TaskStore } from "./store/tasks.ts";
 import { SettingsStore } from "./store/settings.ts";
@@ -13,6 +14,7 @@ import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
 import { buildServer } from "./server.ts";
 
+loadDotEnv(); // 先加载 engine/.env（Gemini Key/模型等），再读各 env 默认。
 const workRoot = resolveWorkRoot();
 const host = process.env.DIGGO_HOST ?? "127.0.0.1";
 const port = Number(process.env.DIGGO_PORT ?? 8787);

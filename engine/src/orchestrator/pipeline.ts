@@ -16,6 +16,9 @@ import { fetchVideoInfo, download } from "../modules/m2-download.ts";
 import { generateFrames } from "../modules/m3-frames.ts";
 import { selectRepresentatives, writeManifest } from "../modules/m5-select.ts";
 import { buildGrids } from "../modules/m6-grids.ts";
+import { generateArticle, type GenerateResult } from "../modules/m7/index.ts";
+import type { GeminiClient } from "../modules/m7/geminiClient.ts";
+import type { AIImageSource } from "@shared/types";
 import { buildDocx } from "../modules/m8-docx.ts";
 
 export interface PipelineHooks {
@@ -108,6 +111,35 @@ export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Prom
   const grids = await buildGrids(td.webp, td.grids, kept);
 
   return { taskDir: td, videoId, videoTitle: title, frames, grids };
+}
+
+export interface ArticleDeps {
+  /** 注入的 Gemini 客户端（queue 据配置构造）。 */
+  client: GeminiClient;
+  videoTitle: string;
+  imageSource: AIImageSource;
+  /** 结构化输出失败重试次数。 */
+  retries?: number;
+}
+
+/**
+ * M7（auto 模式）：素材 → Gemini → Article，落盘 article.json，停在"喂 AI 之后"。
+ * 失败抛错由调用方降级到半自动 UI（AI 集成文档 §6）。semi 模式不走这里。
+ */
+export async function runArticle(
+  taskDir: TaskDir,
+  deps: ArticleDeps,
+  onStep?: (progress: StepProgress) => void | Promise<void>,
+): Promise<GenerateResult> {
+  await onStep?.({ step: "article", message: "调用 Gemini 生成文章…" });
+  return generateArticle({
+    taskDir,
+    videoTitle: deps.videoTitle,
+    imageSource: deps.imageSource,
+    client: deps.client,
+    ...(deps.retries != null ? { retries: deps.retries } : {}),
+    onProgress: (message) => void onStep?.({ step: "article", message }),
+  });
 }
 
 export interface DocxResult {

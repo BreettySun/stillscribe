@@ -8,9 +8,12 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { DEFAULTS, type Article, type TaskParams, type VideoQuality } from "@shared/types";
+import { DEFAULTS, type Article, type ArticleMode, type TaskParams, type VideoQuality } from "@shared/types";
+import { loadDotEnv } from "./env.ts";
 import { resolveCookiesFile } from "./paths.ts";
-import { runToGrids, runDocx } from "./orchestrator/pipeline.ts";
+import { runToGrids, runDocx, runArticle } from "./orchestrator/pipeline.ts";
+import { createGeminiClient } from "./modules/m7/geminiClient.ts";
+import { resolveAIConfig } from "./modules/m7/config.ts";
 
 interface Cli {
   url: string;
@@ -18,6 +21,7 @@ interface Cli {
   browser?: string;
   workRoot: string;
   threshold: number;
+  mode: ArticleMode;
 }
 
 function parseArgs(argv: string[]): Cli {
@@ -26,6 +30,7 @@ function parseArgs(argv: string[]): Cli {
   let browser: string | undefined;
   let workRoot = path.resolve("work");
   let threshold: number = DEFAULTS.dedupThreshold;
+  let mode: ArticleMode = "semi";
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -33,16 +38,17 @@ function parseArgs(argv: string[]): Cli {
     else if (a === "--browser") browser = argv[++i];
     else if (a === "--work-root") workRoot = path.resolve(argv[++i]!);
     else if (a === "--threshold") threshold = Number(argv[++i]);
+    else if (a === "--mode") mode = argv[++i] === "auto" ? "auto" : "semi";
     else positional.push(a);
   }
 
   const url = positional[0];
   if (!url) {
     throw new Error(
-      "用法: tsx src/run.ts <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--threshold N] [--work-root <dir>]",
+      "用法: tsx src/run.ts <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--threshold N] [--mode auto|semi] [--work-root <dir>]",
     );
   }
-  return { url, quality, browser, workRoot, threshold };
+  return { url, quality, browser, workRoot, threshold, mode };
 }
 
 async function runPipeline(cli: Cli): Promise<void> {
@@ -51,7 +57,7 @@ async function runPipeline(cli: Cli): Promise<void> {
     quality: cli.quality,
     dedup: true,
     dedupThreshold: cli.threshold,
-    mode: "semi",
+    mode: cli.mode,
   };
 
   // 按任务即时探测 <workRoot>/cookies.txt（或 DIGGO_COOKIES_FILE 覆盖）；无效则回退 --cookies-from-browser。
@@ -65,10 +71,27 @@ async function runPipeline(cli: Cli): Promise<void> {
   });
   console.error(`[done] ${videoId} — ${videoTitle}: ${frames} 帧, ${grids.length} 张宫格图 → ${td.root}`);
 
-  // M7：暂由 Claude 读宫格图+字幕生成 article.json 回填（无 Gemini Key）。
+  // M7 全自动(auto)：直接调 Gemini 生成 article.json（配置由 resolveAIConfig 从 engine/.env 读 Key + 代码默认模型）。
+  if (cli.mode === "auto" && !existsSync(td.articleJson)) {
+    const cfg = resolveAIConfig();
+    if (!cfg.apiKey) {
+      console.error("\n⏸  --mode auto 需在 engine/.env 配置 DIGGO_GEMINI_API_KEY；未设置，降级为半自动（见下）。");
+    } else {
+      const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
+      const { warnings: w } = await runArticle(
+        td,
+        { client, videoTitle, imageSource: cfg.imageSource },
+        ({ message }) => console.error(`[article] ${message ?? ""}`),
+      );
+      for (const m of w) console.error(`     [warn] ${m}`);
+      console.error(`[article] 已生成 ${td.articleJson}`);
+    }
+  }
+
+  // M7 半自动(semi)/auto 降级：由人读宫格图+字幕生成 article.json 回填。
   if (!existsSync(td.articleJson)) {
     console.error(
-      `\n⏸  等待 article.json（M7 待建：把 ${td.grids} 的宫格图 + 字幕交给 Claude，` +
+      `\n⏸  等待 article.json（把 ${td.grids} 的宫格图 + 字幕交给模型，` +
         `按共享 Article 契约生成 JSON 存为 ${td.articleJson}，再重跑续接 M8）。`,
     );
     return;
@@ -87,6 +110,7 @@ async function runPipeline(cli: Cli): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  loadDotEnv(); // 加载 engine/.env（Gemini Key/模型），供 --mode auto 使用。
   await runPipeline(parseArgs(process.argv.slice(2)));
 }
 
