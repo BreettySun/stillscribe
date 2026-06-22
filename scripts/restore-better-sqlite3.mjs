@@ -10,7 +10,9 @@ import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 
-const require = createRequire(new URL("../engine/package.json", import.meta.url));
+const require = createRequire(
+	new URL("../engine/package.json", import.meta.url),
+);
 // 从 engine 解析 better-sqlite3 真实安装目录（pnpm 软链也能解开）。
 const dir = dirname(require.resolve("better-sqlite3/package.json"));
 

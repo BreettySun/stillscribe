@@ -14,7 +14,7 @@ const message = useMessage();
 const urlsText = ref("");
 const busy = ref(false);
 
-const adv = reactive<AdvancedModel>({
+let adv = reactive<AdvancedModel>({
 	quality: DEFAULTS.quality,
 	mode: DEFAULTS.mode,
 	dedup: DEFAULTS.dedup,
