@@ -67,6 +67,8 @@ export interface TaskParams {
 	browser?: CookieBrowser;
 	/** 选用的 Prompt 模板 ID；省略用默认模板。 */
 	promptTemplateId?: string;
+	/** 本次提交使用的提示词模板全文；省略=用引擎默认模板。仅本次提交生效，不回写默认模板。 */
+	promptOverride?: string;
 	/** 是否执行 M10 视频切片（可选、默认 false）。 */
 	makeClips?: boolean;
 }
@@ -291,6 +293,12 @@ export const AI_DEFAULTS: Omit<AISettings, "hasApiKey"> = {
 	model: "gemini-2.5-flash",
 	imageSource: "grids",
 };
+
+/** 默认提示词模板（只读）。用于建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位。 */
+export interface PromptTemplateInfo {
+	/** 引擎当前默认提示词模板全文。 */
+	template: string;
+}
 
 // ============================================================
 // 默认值（建议常量，前后端共用，避免魔法数）

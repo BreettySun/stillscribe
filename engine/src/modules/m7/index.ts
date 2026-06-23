@@ -26,6 +26,8 @@ export interface GenerateOptions {
   videoTitle: string;
   /** 喂图策略。 */
   imageSource: AIImageSource;
+  /** 本次提交的自定义提示词模板全文；省略=用引擎默认模板。 */
+  promptOverride?: string;
   /** 已注入的客户端（依赖倒置，便于测试 / 换供应商）。 */
   client: GeminiClient;
   /** 结构化输出失败重试次数（§6：重试几次仍失败再降级）。默认 2。 */
@@ -81,7 +83,10 @@ export async function generateArticle(opts: GenerateOptions): Promise<GenerateRe
   if (images.length === 0) throw new Error("没有可喂模型的图片（M5/M6 未产出？）");
   const srt = await findSubtitlePath(td.source);
   const subtitles = await loadCleanSubtitles(srt);
-  const prompt = await renderPrompt({ videoTitle: opts.videoTitle, imageCount: images.length });
+  const prompt = await renderPrompt(
+    { videoTitle: opts.videoTitle, imageCount: images.length },
+    opts.promptOverride,
+  );
 
   opts.onProgress?.(`调用 Gemini 生成文章（${images.length} 图，${imageSource}）…`);
   const article = await generateWithRetry(client, { images, subtitles, prompt }, opts.retries ?? 2);

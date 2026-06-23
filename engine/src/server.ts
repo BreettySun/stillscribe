@@ -16,6 +16,7 @@ import {
 	type ExportRequest,
 	type Frame,
 	type GridList,
+	type PromptTemplateInfo,
 	type SubmitResult,
 	type SwapImageRequest,
 	type TaskParams,
@@ -28,6 +29,7 @@ import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
 import { readAISettings } from "./modules/m7/config.ts";
+import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
 import type { EventBus } from "./orchestrator/events.ts";
@@ -61,6 +63,20 @@ const COOKIE_BROWSERS: readonly CookieBrowser[] = [
 	"opera",
 ];
 
+/** 自定义提示词全文上限（防滥用）。 */
+const PROMPT_OVERRIDE_MAX = 50_000;
+
+/** 规整可选的 promptOverride：非字符串/空白 → 不带该字段；超长抛 400。 */
+function normalizePromptOverride(x: unknown): { promptOverride?: string } {
+	if (typeof x !== "string") return {};
+	const v = x.trim();
+	if (!v) return {};
+	if (v.length > PROMPT_OVERRIDE_MAX) {
+		throw new HttpError(400, `promptOverride 过长（> ${PROMPT_OVERRIDE_MAX} 字符）`);
+	}
+	return { promptOverride: v };
+}
+
 /** 把不可信输入规整成 TaskParams 并填默认值；url 缺失抛 400，browser 非法抛 400。 */
 function normalizeParams(x: unknown): TaskParams {
 	const o = (x ?? {}) as Record<string, unknown>;
@@ -85,6 +101,7 @@ function normalizeParams(x: unknown): TaskParams {
 		...(typeof o.promptTemplateId === "string"
 			? { promptTemplateId: o.promptTemplateId }
 			: {}),
+		...normalizePromptOverride(o.promptOverride),
 		makeClips: o.makeClips === true,
 	};
 }
@@ -274,6 +291,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
 	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
 	app.get("/settings/ai", () => readAISettings());
+
+	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----
+	app.get(
+		"/settings/prompt",
+		async (): Promise<PromptTemplateInfo> => ({ template: await loadPromptTemplate() }),
+	);
 
 	// ---- 静态产物（含路径穿越防护）----
 	const sendImage = async (

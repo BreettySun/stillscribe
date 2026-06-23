@@ -9,6 +9,7 @@ import type {
 	ExportResult,
 	Frame,
 	GridList,
+	PromptTemplateInfo,
 	SubmitResult,
 	SwapImageRequest,
 	Task,
@@ -81,6 +82,10 @@ export const api = {
 
 	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
 	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
+
+	/** 默认提示词模板（只读）：建任务时展示/可编辑的底稿。 */
+	getPromptTemplate: () =>
+		fetch(`${BASE}/settings/prompt`).then(parse<PromptTemplateInfo>),
 
 	listGrids: (id: string) =>
 		fetch(`${BASE}/tasks/${id}/grids`).then(parse<GridList>),

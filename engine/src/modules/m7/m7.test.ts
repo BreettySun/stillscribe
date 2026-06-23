@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { cleanSrt } from "./subtitles.ts";
 import { parseAndValidateArticle } from "./parse.ts";
 import { articleResponseSchema } from "./schema.ts";
+import { renderPrompt, loadPromptTemplate } from "./prompt.ts";
 
 describe("cleanSrt 字幕清洗", () => {
   it("剥离序号/时间码/标签，合并紧邻重复行", () => {
@@ -46,6 +47,31 @@ describe("parseAndValidateArticle", () => {
 
   it("形状不合抛错（缺 meta）", () => {
     expect(() => parseAndValidateArticle(JSON.stringify({ pages: [] }))).toThrow();
+  });
+});
+
+describe("renderPrompt 提示词渲染", () => {
+  it("override 模板优先，并替换 {{var}} 占位", async () => {
+    const out = await renderPrompt(
+      { videoTitle: "x", imageCount: 3 },
+      "T={{videoTitle}}/{{imageCount}}",
+    );
+    expect(out).toBe("T=x/3");
+  });
+
+  it("不传 override 时用默认模板（与 loadPromptTemplate 同源）", async () => {
+    const out = await renderPrompt({ videoTitle: "标题", imageCount: 5 });
+    const tpl = await loadPromptTemplate();
+    const expected = tpl
+      .replace(/\{\{\s*videoTitle\s*\}\}/g, "标题")
+      .replace(/\{\{\s*imageCount\s*\}\}/g, "5");
+    expect(out).toBe(expected);
+  });
+
+  it("空串 override 视为未传，回退默认模板", async () => {
+    const withEmpty = await renderPrompt({ videoTitle: "a", imageCount: 1 }, "");
+    const withDefault = await renderPrompt({ videoTitle: "a", imageCount: 1 });
+    expect(withEmpty).toBe(withDefault);
   });
 });
 

@@ -44,21 +44,27 @@ const PLACEHOLDER_TEMPLATE = `【占位提示词 — 待录入既有半自动同
 - meta 给出候选标题(titles)、关键词(keywords)、摘要(description)。`;
 
 /**
- * 渲染提示词。取模板优先级：
+ * 解析默认提示词模板（未做 {{var}} 替换）。取模板优先级：
  *   1) 打包时烤入的 __DIGGO_PROMPT_TEMPLATE__（packaged）；
  *   2) 源 prompt.template.txt（dev，单一事实来源）；
  *   3) 占位模板（都没有时兜底）。
- * 支持 {{var}} 占位替换。
  */
-export async function renderPrompt(vars: PromptVars): Promise<string> {
-  let tpl: string;
+export async function loadPromptTemplate(): Promise<string> {
   if (typeof __DIGGO_PROMPT_TEMPLATE__ === "string" && __DIGGO_PROMPT_TEMPLATE__) {
-    tpl = __DIGGO_PROMPT_TEMPLATE__;
-  } else if (existsSync(PROMPT_TEMPLATE_FILE)) {
-    tpl = await readFile(PROMPT_TEMPLATE_FILE, "utf-8");
-  } else {
-    tpl = PLACEHOLDER_TEMPLATE;
+    return __DIGGO_PROMPT_TEMPLATE__;
   }
+  if (existsSync(PROMPT_TEMPLATE_FILE)) {
+    return readFile(PROMPT_TEMPLATE_FILE, "utf-8");
+  }
+  return PLACEHOLDER_TEMPLATE;
+}
+
+/**
+ * 渲染提示词。模板来源：传入 `override` 则以它为模板（本次提交的自定义提示词），
+ * 否则取默认模板（见 loadPromptTemplate）。两者都支持 {{var}} 占位替换。
+ */
+export async function renderPrompt(vars: PromptVars, override?: string): Promise<string> {
+  const tpl = override != null && override !== "" ? override : await loadPromptTemplate();
   const dict = vars as unknown as Record<string, unknown>;
   return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => {
     const v = dict[k];

@@ -118,6 +118,8 @@ export interface ArticleDeps {
   client: GeminiClient;
   videoTitle: string;
   imageSource: AIImageSource;
+  /** 本次提交的自定义提示词模板全文；省略=用引擎默认模板。 */
+  promptOverride?: string;
   /** 结构化输出失败重试次数。 */
   retries?: number;
 }
@@ -137,6 +139,7 @@ export async function runArticle(
     videoTitle: deps.videoTitle,
     imageSource: deps.imageSource,
     client: deps.client,
+    ...(deps.promptOverride != null ? { promptOverride: deps.promptOverride } : {}),
     ...(deps.retries != null ? { retries: deps.retries } : {}),
     onProgress: (message) => void onStep?.({ step: "article", message }),
   });

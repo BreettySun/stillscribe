@@ -62,21 +62,21 @@ const summaryTags = computed(() => {
 				label-placement="top"
 				:show-feedback="false">
 				<n-grid
-					:cols="4"
+					:cols="6"
 					:x-gap="16"
 					:y-gap="20"
 					responsive="screen"
 					item-responsive>
 					<n-form-item-gi
 						label="画质"
-						:span="2">
+						:span="3">
 						<n-select
 							v-model:value="model.quality"
 							:options="qualityOptions" />
 					</n-form-item-gi>
 					<n-form-item-gi
 						label="模式"
-						:span="2">
+						:span="3">
 						<n-select
 							v-model:value="model.mode"
 							:options="modeOptions" />
@@ -89,7 +89,7 @@ const summaryTags = computed(() => {
 					<n-form-item-gi
 						v-if="model.dedup"
 						label="去重阈值"
-						:span="1">
+						:span="2">
 						<n-input-number
 							v-model:value="model.threshold"
 							:min="0"

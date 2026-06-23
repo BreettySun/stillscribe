@@ -173,9 +173,15 @@ export class Orchestrator {
     try {
       const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
       this.store.update(id, { currentStep: "article" });
+      const promptOverride = this.store.get(id)?.params.promptOverride;
       const { article, warnings } = await runArticle(
         grids.taskDir,
-        { client, videoTitle: grids.videoTitle, imageSource: cfg.imageSource },
+        {
+          client,
+          videoTitle: grids.videoTitle,
+          imageSource: cfg.imageSource,
+          ...(promptOverride != null ? { promptOverride } : {}),
+        },
         (progress) => {
           this.store.update(id, { currentStep: progress.step });
           this.bus.emit({ type: "progress", taskId: id, progress });
