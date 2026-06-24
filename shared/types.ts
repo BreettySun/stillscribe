@@ -202,6 +202,8 @@ export interface Task {
 //  POST /tasks/:id/article   body: Article (半自动回填)        -> Task
 //  POST /tasks/:id/export    body: ExportRequest              -> ExportResult
 //                            (target="feishu" 时上传 docx 导入飞书并返回 feishuUrl；未配置凭证 -> 400)
+//  POST /tasks/:id/reopen                                     -> Task   (completed/failed → awaiting_review，返回校对；清 feishuUrl/error)
+//  POST /tasks/:id/reopen-docx                                -> Task   (failed → completed，飞书失败回 docx 结果页；清 error)
 //  POST /tasks/:id/cancel                                     -> Task
 //
 //  --- AI 全自动状态（M7，只读；model/Key 由代码侧配置 engine/.env，不经 HTTP 修改，绝不回传明文）---

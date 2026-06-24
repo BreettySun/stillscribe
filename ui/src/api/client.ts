@@ -42,6 +42,14 @@ export const api = {
 			body: JSON.stringify(body),
 		}).then(parse<SubmitResult>),
 
+	/** 返回上一步：completed/failed → awaiting_review（保留 article，清 feishuUrl/error）。 */
+	reopen: (id: string) =>
+		fetch(`${BASE}/tasks/${id}/reopen`, { method: "POST" }).then(parse<Task>),
+
+	/** 返回上一步（飞书失败 → docx 结果页）：failed → completed。 */
+	reopenDocx: (id: string) =>
+		fetch(`${BASE}/tasks/${id}/reopen-docx`, { method: "POST" }).then(parse<Task>),
+
 	cancel: (id: string) =>
 		fetch(`${BASE}/tasks/${id}/cancel`, { method: "POST" }).then(parse<Task>),
 

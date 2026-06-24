@@ -55,7 +55,7 @@ export interface TaskPatch {
   workDir?: string;
   article?: Article | null;
   outputDocx?: string;
-  feishuUrl?: string;
+  feishuUrl?: string | null;
   error?: string | null;
 }
 
@@ -124,7 +124,8 @@ export class TaskStore {
       article:
         patch.article === undefined ? current.article ?? null : patch.article,
       outputDocx: patch.outputDocx ?? current.outputDocx ?? null,
-      feishuUrl: patch.feishuUrl ?? current.feishuUrl ?? null,
+      feishuUrl:
+        patch.feishuUrl === undefined ? current.feishuUrl ?? null : patch.feishuUrl,
       error: patch.error === undefined ? current.error ?? null : patch.error,
       updatedAt: new Date().toISOString(),
     };

@@ -176,6 +176,14 @@ export const useTasksStore = defineStore("tasks", () => {
 		await refresh(id);
 		return feishuUrl;
 	}
+	/** 返回上一步（docx 结果页/docx 失败 → 校对页）：completed/failed → awaiting_review。 */
+	async function reopenReview(id: TaskId): Promise<void> {
+		upsert(await api.reopen(id));
+	}
+	/** 返回上一步（飞书失败页 → docx 结果页）：failed → completed。 */
+	async function reopenDocxResult(id: TaskId): Promise<void> {
+		upsert(await api.reopenDocx(id));
+	}
 
 	return {
 		byId,
@@ -196,5 +204,7 @@ export const useTasksStore = defineStore("tasks", () => {
 		swap,
 		exportDocx,
 		importToFeishu,
+		reopenReview,
+		reopenDocxResult,
 	};
 });

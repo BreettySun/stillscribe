@@ -232,6 +232,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		return { docxPath };
 	});
 
+	// 返回上一步：completed/failed → awaiting_review（保留 article，清 feishuUrl/error）。
+	app.post("/tasks/:id/reopen", (req) => {
+		const id = (req.params as { id: string }).id;
+		taskOr404(id);
+		return orchestrator.reopenReview(id);
+	});
+
+	// 返回上一步（飞书失败 → docx 结果页）：failed → completed（docx 已留底，可重试导入）。
+	app.post("/tasks/:id/reopen-docx", (req) => {
+		const id = (req.params as { id: string }).id;
+		taskOr404(id);
+		return orchestrator.reopenDocxResult(id);
+	});
+
 	app.post("/tasks/:id/cancel", (req) =>
 		orchestrator.cancel((req.params as { id: string }).id),
 	);

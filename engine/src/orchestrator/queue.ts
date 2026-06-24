@@ -25,8 +25,9 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   queued: ["running", "canceled"],
   running: ["awaiting_review", "completed", "failed", "canceled"],
   awaiting_review: ["running", "completed", "failed", "canceled"],
-  completed: [],
-  failed: ["queued"],
+  completed: ["awaiting_review"], // 返回上一步：docx/飞书结果页回校对
+  failed: ["queued", "awaiting_review", "completed"], // queued=重试整条流水线；awaiting_review=docx 失败回校对；completed=飞书失败回 docx 结果页
+
   canceled: ["queued"],
 };
 
@@ -117,6 +118,36 @@ export class Orchestrator {
     const task = this.store.get(id);
     if (!task) throw new Error(`任务不存在: ${id}`);
     return this.store.update(id, { article: article ?? null });
+  }
+
+  /**
+   * 返回上一步（结果页/失败页 → 校对页）：completed | failed → awaiting_review。
+   * 清 feishuUrl（回校对意味着 article 可能变、旧导入作废）与 error（失败后回退则作废旧错误）；
+   * outputDocx 保留（下次导出覆盖同路径）。导出/飞书失败时 article 仍在，可直接回校对重试，无需重跑整条流水线。
+   */
+  reopenReview(id: string): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (!task.article) throw new Error("任务尚无 article，无法返回校对");
+    this.store.update(id, { currentStep: null, feishuUrl: null, error: null });
+    this.transition(id, "awaiting_review");
+    const after = this.store.get(id)!;
+    this.bus.emit({ type: "awaiting_review", taskId: id, article: after.article! });
+    return after;
+  }
+
+  /**
+   * 返回上一步（飞书失败页 → docx 结果页）：failed → completed。
+   * docx 已留底（outputDocx 在），仅飞书子步失败；回到 docx 结果页即可重试导入。清 error/feishuUrl。
+   */
+  reopenDocxResult(id: string): Task {
+    const task = this.store.get(id);
+    if (!task) throw new Error(`任务不存在: ${id}`);
+    if (!task.outputDocx) throw new Error("任务无 docx 产物，无法返回结果页");
+    this.store.update(id, { currentStep: null, feishuUrl: null, error: null });
+    this.transition(id, "completed");
+    this.bus.emit({ type: "completed", taskId: id, outputDocx: task.outputDocx });
+    return this.store.get(id)!;
   }
 
   /** 换图：改某页配图时间戳。 */
