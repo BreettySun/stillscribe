@@ -90,7 +90,11 @@ export const useTasksStore = defineStore("tasks", () => {
 				patch(e.taskId, { status: "awaiting_review", article: e.article });
 				break;
 			case "completed":
-				patch(e.taskId, { status: "completed", outputDocx: e.outputDocx });
+				patch(e.taskId, {
+					status: "completed",
+					outputDocx: e.outputDocx,
+					...(e.feishuUrl ? { feishuUrl: e.feishuUrl } : {}),
+				});
 				notify("任务完成", titleOf(e.taskId));
 				break;
 			case "failed":
@@ -162,9 +166,15 @@ export const useTasksStore = defineStore("tasks", () => {
 		upsert(await api.swap(id, req));
 	}
 	async function exportDocx(id: TaskId): Promise<string> {
-		const { docxPath } = await api.exportDocx(id);
+		const { docxPath } = await api.exportDocx(id, "local");
 		await refresh(id);
 		return docxPath;
+	}
+	/** 导入飞书：上传 docx → 导入 → 返回在线文档链接（失败抛错，本地 docx 已留底）。 */
+	async function importToFeishu(id: TaskId): Promise<string | undefined> {
+		const { feishuUrl } = await api.exportDocx(id, "feishu");
+		await refresh(id);
+		return feishuUrl;
 	}
 
 	return {
@@ -185,5 +195,6 @@ export const useTasksStore = defineStore("tasks", () => {
 		saveArticle,
 		swap,
 		exportDocx,
+		importToFeishu,
 	};
 });

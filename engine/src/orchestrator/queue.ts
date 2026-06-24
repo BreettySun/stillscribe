@@ -12,9 +12,10 @@
  * 全自动(auto)：runToGrids 后直接调 Gemini(M7) 生成 article 草稿再进 awaiting_review（仍让人工校对/换图）；
  *               缺 Key / API 失败则降级——不让任务失败，照样进 awaiting_review 让人工接手（AI 集成文档 §6）。
  */
-import type { SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
+import type { ExportTarget, SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
 import { TaskDir, resolveCookiesFile } from "../paths.ts";
 import { runToGrids, runDocx, runArticle, type GridsResult } from "./pipeline.ts";
+import { importDocxToFeishu } from "../modules/m9-feishu/index.ts";
 import { resolveAIConfig } from "../modules/m7/config.ts";
 import { createGeminiClient } from "../modules/m7/geminiClient.ts";
 import type { EventBus } from "./events.ts";
@@ -132,8 +133,15 @@ export class Orchestrator {
     return this.store.update(id, { article: next });
   }
 
-  /** 导出 docx（M8）：awaiting_review → running → completed。 */
-  async exportDocx(id: string): Promise<{ docxPath: string; warnings: string[] }> {
+  /**
+   * 导出（M8 docx + 可选 M9 飞书）：awaiting_review → running → completed。
+   * target="local"：只生成 docx（落盘留底）。
+   * target="feishu"：生成 docx 后用其 buffer 上传飞书并返回 feishuUrl；失败落 failed，本地 docx 仍留底兜底。
+   */
+  async exportDocx(
+    id: string,
+    target: ExportTarget = "local",
+  ): Promise<{ docxPath: string; feishuUrl?: string; warnings: string[] }> {
     const task = this.store.get(id);
     if (!task) throw new Error(`任务不存在: ${id}`);
     if (!task.article) throw new Error("任务尚无 article，无法导出（semi 模式请先回填）");
@@ -144,11 +152,26 @@ export class Orchestrator {
     this.bus.emit({ type: "progress", taskId: id, progress: { step: "docx", message: "生成 docx…" } });
     try {
       const td = new TaskDir(task.workDir);
-      const { docxPath, warnings } = await runDocx(task.article, td);
+      const { docxPath, buffer, warnings } = await runDocx(task.article, td);
       this.store.update(id, { outputDocx: docxPath, currentStep: null });
+
+      let feishuUrl: string | undefined;
+      if (target === "feishu") {
+        this.store.update(id, { currentStep: "publish" });
+        const emitPublish = (message: string) => {
+          this.store.update(id, { currentStep: "publish" });
+          this.bus.emit({ type: "progress", taskId: id, progress: { step: "publish", message } });
+        };
+        emitPublish("上传到飞书…");
+        const fileName = `${task.videoTitle ?? task.id}.docx`;
+        const result = await importDocxToFeishu(buffer, { fileName, onProgress: emitPublish });
+        feishuUrl = result.url;
+        this.store.update(id, { feishuUrl, currentStep: null });
+      }
+
       this.transition(id, "completed");
-      this.bus.emit({ type: "completed", taskId: id, outputDocx: docxPath });
-      return { docxPath, warnings };
+      this.bus.emit({ type: "completed", taskId: id, outputDocx: docxPath, ...(feishuUrl ? { feishuUrl } : {}) });
+      return { docxPath, ...(feishuUrl ? { feishuUrl } : {}), warnings };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.store.update(id, { error: msg });

@@ -7,6 +7,8 @@ import type {
 	Article,
 	BatchSubmit,
 	ExportResult,
+	ExportTarget,
+	FeishuSettings,
 	Frame,
 	GridList,
 	PromptTemplateInfo,
@@ -65,11 +67,12 @@ export const api = {
 			body: JSON.stringify(req),
 		}).then(parse<Task>),
 
-	exportDocx: (id: string) =>
+	/** 导出：target="local" 生成 docx；target="feishu" 导入飞书并返回 feishuUrl。 */
+	exportDocx: (id: string, target: ExportTarget = "local") =>
 		fetch(`${BASE}/tasks/${id}/export`, {
 			method: "POST",
 			headers: JSON_HEADERS,
-			body: JSON.stringify({ target: "local" }),
+			body: JSON.stringify({ target }),
 		}).then(parse<ExportResult>),
 
 	getSettings: () => fetch(`${BASE}/settings`).then(parse<UISettings>),
@@ -82,6 +85,10 @@ export const api = {
 
 	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
 	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
+
+	/** 飞书导入状态（只读）：是否已配置凭证。凭证由引擎侧 engine/.env 配置。 */
+	getFeishuSettings: () =>
+		fetch(`${BASE}/settings/feishu`).then(parse<FeishuSettings>),
 
 	/** 默认提示词模板（只读）：建任务时展示/可编辑的底稿。 */
 	getPromptTemplate: () =>

@@ -23,6 +23,7 @@ interface Row {
   workDir: string;
   article: string | null;
   outputDocx: string | null;
+  feishuUrl: string | null;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +42,7 @@ function rowToTask(r: Row): Task {
   if (r.videoTitle) task.videoTitle = r.videoTitle;
   if (r.article) task.article = JSON.parse(r.article) as Article;
   if (r.outputDocx) task.outputDocx = r.outputDocx;
+  if (r.feishuUrl) task.feishuUrl = r.feishuUrl;
   if (r.error) task.error = r.error;
   return task;
 }
@@ -53,6 +55,7 @@ export interface TaskPatch {
   workDir?: string;
   article?: Article | null;
   outputDocx?: string;
+  feishuUrl?: string;
   error?: string | null;
 }
 
@@ -72,11 +75,17 @@ export class TaskStore {
         workDir     TEXT NOT NULL DEFAULT '',
         article     TEXT,
         outputDocx  TEXT,
+        feishuUrl   TEXT,
         error       TEXT,
         createdAt   TEXT NOT NULL,
         updatedAt   TEXT NOT NULL
       );
     `);
+    // 迁移：旧库补 feishuUrl 列（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）。
+    const cols = this.db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === "feishuUrl")) {
+      this.db.exec(`ALTER TABLE tasks ADD COLUMN feishuUrl TEXT`);
+    }
   }
 
   create(params: TaskParams): Task {
@@ -115,6 +124,7 @@ export class TaskStore {
       article:
         patch.article === undefined ? current.article ?? null : patch.article,
       outputDocx: patch.outputDocx ?? current.outputDocx ?? null,
+      feishuUrl: patch.feishuUrl ?? current.feishuUrl ?? null,
       error: patch.error === undefined ? current.error ?? null : patch.error,
       updatedAt: new Date().toISOString(),
     };
@@ -124,7 +134,7 @@ export class TaskStore {
         `UPDATE tasks SET
            status=@status, currentStep=@currentStep, videoTitle=@videoTitle,
            workDir=@workDir, article=@article, outputDocx=@outputDocx,
-           error=@error, updatedAt=@updatedAt
+           feishuUrl=@feishuUrl, error=@error, updatedAt=@updatedAt
          WHERE id=@id`,
       )
       .run({
@@ -135,6 +145,7 @@ export class TaskStore {
         workDir: merged.workDir,
         article: merged.article ? JSON.stringify(merged.article) : null,
         outputDocx: merged.outputDocx,
+        feishuUrl: merged.feishuUrl,
         error: merged.error,
         updatedAt: merged.updatedAt,
       });

@@ -9,6 +9,7 @@
  * 让长命令在中途收到 abort 即 SIGKILL 子进程立即中断，而非等命令跑完才响应。
  */
 import { mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULTS, type Article, type StepProgress, type TaskParams } from "@shared/types";
 import { TaskDir, matchFiles } from "../paths.ts";
@@ -147,10 +148,15 @@ export async function runArticle(
 
 export interface DocxResult {
   docxPath: string;
+  /** docx 二进制（buffer-first）：调用方可直接喂飞书导入，省去再次读盘（《飞书集成》§2）。 */
+  buffer: Buffer;
   warnings: string[];
 }
 
-/** M8：读 Article 程序化生成 docx。幂等由调用方决定（已存在则可跳过）。 */
+/**
+ * M8：读 Article 程序化生成 docx。返回内存 buffer + 落盘留底路径。
+ * buffer-first：buffer 既写盘留底（兜底/本地下载），也供 M9 直接喂飞书导入。幂等由调用方决定。
+ */
 export async function runDocx(
   article: Article,
   taskDir: TaskDir,
@@ -158,6 +164,7 @@ export async function runDocx(
 ): Promise<DocxResult> {
   await onStep?.({ step: "docx", message: "程序化生成 docx…" });
   mkdirSync(path.dirname(taskDir.docx), { recursive: true }); // 幂等：恢复/重导时确保 article/ 存在
-  const warnings = await buildDocx(article, taskDir.hd, taskDir.docx);
-  return { docxPath: taskDir.docx, warnings };
+  const { buffer, warnings } = await buildDocx(article, taskDir.hd);
+  await writeFile(taskDir.docx, buffer); // 落盘留底
+  return { docxPath: taskDir.docx, buffer, warnings };
 }

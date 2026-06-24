@@ -4,13 +4,16 @@ import { ref } from "vue";
 import { useMessage } from "naive-ui";
 import type { Task } from "@shared/types";
 import { useTasksStore } from "../../stores/tasks";
+import { useSettingsStore } from "../../stores/settings";
 import { isDesktop, revealInFolder } from "../../bridge";
 
 const props = defineProps<{ task: Task }>();
 const store = useTasksStore();
+const settings = useSettingsStore();
 const message = useMessage();
 
 const exporting = ref(false);
+const importing = ref(false);
 
 async function onRegenerate(): Promise<void> {
   exporting.value = true;
@@ -21,6 +24,18 @@ async function onRegenerate(): Promise<void> {
     message.error(e instanceof Error ? e.message : String(e));
   } finally {
     exporting.value = false;
+  }
+}
+
+async function onImportFeishu(): Promise<void> {
+  importing.value = true;
+  try {
+    const url = await store.importToFeishu(props.task.id);
+    message.success(url ? "已导入飞书" : "导入完成");
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : String(e));
+  } finally {
+    importing.value = false;
   }
 }
 
@@ -49,6 +64,26 @@ async function onResubmit(): Promise<void> {
             在 Finder 中显示
           </n-button>
           <n-button tertiary :loading="exporting" @click="onRegenerate">重新生成</n-button>
+        </n-space>
+      </n-card>
+
+      <n-card v-if="settings.feishuConfigured" size="small" title="飞书">
+        <n-space vertical :size="8">
+          <a
+            v-if="task.feishuUrl"
+            :href="task.feishuUrl"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <n-button type="primary">在飞书中打开</n-button>
+          </a>
+          <n-button
+            v-else
+            :loading="importing"
+            @click="onImportFeishu"
+          >
+            导入飞书
+          </n-button>
         </n-space>
       </n-card>
     </template>

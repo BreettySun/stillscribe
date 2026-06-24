@@ -6,7 +6,7 @@
  * 铁律 #4：ArticleNotes（中文说明 / CoT）绝不进 docx —— 本模块直接忽略 article.notes。
  * 缺图：记 warning、跳过该图、不中断。
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	Document,
@@ -38,12 +38,18 @@ async function readImageIfExists(p: string): Promise<Buffer | null> {
 	}
 }
 
-/** 生成 docx。返回 warnings（缺图清单）。 */
+export interface DocxBuild {
+	/** docx 二进制内容（buffer-first：既可落盘留底，也可直接喂飞书导入，见《飞书集成》§2）。 */
+	buffer: Buffer;
+	/** 缺图清单。 */
+	warnings: string[];
+}
+
+/** 生成 docx，返回内存 buffer + warnings（缺图清单）。落盘与否由调用方（runDocx）决定。 */
 export async function buildDocx(
 	article: Article,
 	hdDir: string,
-	outPath: string,
-): Promise<string[]> {
+): Promise<DocxBuild> {
 	const warnings: string[] = [];
 	const children: Paragraph[] = [];
 
@@ -87,6 +93,6 @@ export async function buildDocx(
 	children.push(new Paragraph({ text: "Description: " + meta.description }));
 
 	const doc = new Document({ sections: [{ children }] });
-	await writeFile(outPath, await Packer.toBuffer(doc));
-	return warnings;
+	const buffer = await Packer.toBuffer(doc);
+	return { buffer, warnings };
 }

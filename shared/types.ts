@@ -181,6 +181,8 @@ export interface Task {
 	article?: Article;
 	/** M8 产物 docx 路径。 */
 	outputDocx?: string;
+	/** M9 飞书导入后的在线文档链接（导入成功后填充）。 */
+	feishuUrl?: string;
 	/** 失败时的错误说明。 */
 	error?: string;
 	createdAt: ISODateTime;
@@ -199,10 +201,14 @@ export interface Task {
 //  POST /tasks/:id/swap      body: SwapImageRequest           -> Task
 //  POST /tasks/:id/article   body: Article (半自动回填)        -> Task
 //  POST /tasks/:id/export    body: ExportRequest              -> ExportResult
+//                            (target="feishu" 时上传 docx 导入飞书并返回 feishuUrl；未配置凭证 -> 400)
 //  POST /tasks/:id/cancel                                     -> Task
 //
 //  --- AI 全自动状态（M7，只读；model/Key 由代码侧配置 engine/.env，不经 HTTP 修改，绝不回传明文）---
 //  GET  /settings/ai                                          -> AISettings        (hasApiKey + model + imageSource)
+//
+//  --- 飞书导入状态（M9，只读；凭证由代码侧配置 engine/.env，不经 HTTP 修改，绝不回传明文）---
+//  GET  /settings/feishu                                      -> FeishuSettings    (configured)
 //
 //  --- 静态资源（给浏览器看图；引擎按任务 workDir 内取，含路径穿越防护）---
 //  GET  /static/:id/grids/:file   -> image/jpeg   宫格图字节（03_grids/<file>）
@@ -254,7 +260,7 @@ export type EngineEvent =
 	| { type: "info"; taskId: TaskId; videoTitle: string; workDir: string }
 	| { type: "progress"; taskId: TaskId; progress: StepProgress }
 	| { type: "awaiting_review"; taskId: TaskId; article: Article }
-	| { type: "completed"; taskId: TaskId; outputDocx: string }
+	| { type: "completed"; taskId: TaskId; outputDocx: string; feishuUrl?: string }
 	| { type: "failed"; taskId: TaskId; error: string }
 	| { type: "task_deleted"; taskId: TaskId };
 
@@ -293,6 +299,16 @@ export const AI_DEFAULTS: Omit<AISettings, "hasApiKey"> = {
 	model: "gemini-2.5-flash",
 	imageSource: "grids",
 };
+
+/**
+ * 飞书导入（M9）设置（只读探测）。
+ * 【铁律 #6】app_id/app_secret/folderToken 只在引擎本地（engine/.env），
+ * 绝不回传渲染进程明文——这里只暴露"是否已配置完整凭证"，供 UI 决定是否显示「导入飞书」。
+ */
+export interface FeishuSettings {
+	/** app_id / app_secret / folderToken 是否都已配置（只读探测，绝不回传明文）。 */
+	configured: boolean;
+}
 
 /** 默认提示词模板（只读）。用于建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位。 */
 export interface PromptTemplateInfo {

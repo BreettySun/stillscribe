@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, mkdir, stat } from "node:fs/promises";
+import { mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -16,7 +16,7 @@ describe("bodyToParagraphTexts", () => {
 });
 
 describe("buildDocx", () => {
-  it("生成非空 docx；缺图记 warning 不中断", async () => {
+  it("生成非空 docx buffer；缺图记 warning 不中断", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "docx-"));
     const hd = path.join(dir, "01_hd");
     await mkdir(hd, { recursive: true });
@@ -33,11 +33,10 @@ describe("buildDocx", () => {
       notes: { frameworkRationale: "不应进 docx 的中文说明" },
     };
 
-    const out = path.join(dir, "article_final.docx");
-    const warnings = await buildDocx(article, hd, out);
+    const { buffer, warnings } = await buildDocx(article, hd);
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("00_00_99");
-    expect((await stat(out)).size).toBeGreaterThan(0);
+    expect(buffer.length).toBeGreaterThan(0);
   });
 });

@@ -29,6 +29,7 @@ import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
 import { readAISettings } from "./modules/m7/config.ts";
+import { readFeishuSettings, isFeishuConfigured } from "./modules/m9-feishu/index.ts";
 import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -218,9 +219,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		taskOr404(id);
 		const body = (req.body ?? {}) as ExportRequest;
 		if (body.target === "feishu") {
-			throw new HttpError(501, "飞书导出二期再做，请用 target=local");
+			if (!isFeishuConfigured()) {
+				throw new HttpError(
+					400,
+					"未配置飞书凭证（engine/.env: DIGGO_FEISHU_APP_ID / DIGGO_FEISHU_APP_SECRET / DIGGO_FEISHU_FOLDER_TOKEN）",
+				);
+			}
+			const { docxPath, feishuUrl } = await orchestrator.exportDocx(id, "feishu");
+			return { docxPath, feishuUrl };
 		}
-		const { docxPath } = await orchestrator.exportDocx(id);
+		const { docxPath } = await orchestrator.exportDocx(id, "local");
 		return { docxPath };
 	});
 
@@ -291,6 +299,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
 	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
 	app.get("/settings/ai", () => readAISettings());
+
+	// ---- 飞书导入状态（M9，只读）。凭证由代码侧配置（engine/.env），仅暴露"是否已配置"（铁律 #6）----
+	app.get("/settings/feishu", () => readFeishuSettings());
 
 	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----
 	app.get(
