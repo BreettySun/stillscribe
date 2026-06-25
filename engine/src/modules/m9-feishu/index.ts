@@ -9,6 +9,7 @@ import {
   uploadDocx,
   createImportTask,
   pollImportTask,
+  deleteFile,
   type ImportResult,
 } from "./client.ts";
 
@@ -41,5 +42,16 @@ export async function importDocxToFeishu(
   const ticket = await createImportTask(cfg, fileToken, opts.fileName);
 
   onProgress?.("等待飞书生成在线文档…");
-  return pollImportTask(cfg, ticket, { onProgress, ...opts.poll });
+  const result = await pollImportTask(cfg, ticket, { onProgress, ...opts.poll });
+
+  // 云文档已生成；删除上传的中间 docx 素材，飞书文件夹里只保留云文档（用户要求）。
+  // 清理失败不影响导入结果——云文档已成功，仅记进度提示。
+  onProgress?.("清理飞书中间 docx…");
+  try {
+    await deleteFile(cfg, fileToken);
+  } catch (err) {
+    onProgress?.(`清理中间 docx 失败（已忽略）：${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  return result;
 }

@@ -4,6 +4,7 @@ import {
   uploadDocx,
   createImportTask,
   pollImportTask,
+  deleteFile,
   _resetTokenCache,
 } from "./client.ts";
 
@@ -98,6 +99,30 @@ describe("飞书 client", () => {
     await expect(
       pollImportTask(cfg, "tk-1", { intervalMs: 0, sleep: async () => {} }),
     ).rejects.toThrow("文件超限");
+  });
+
+  it("deleteFile 按 file_token 调 DELETE 删除中间素材", async () => {
+    let deletedUrl = "";
+    let method = "";
+    globalThis.fetch = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v3/tenant_access_token/internal")) {
+        return new Response(
+          JSON.stringify({ code: 0, tenant_access_token: "t-abc", expire: 7200 }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      deletedUrl = url;
+      method = init?.method ?? "";
+      return new Response(JSON.stringify({ code: 0, data: { task_id: "task-1" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    await deleteFile(cfg, "ft-1");
+    expect(method).toBe("DELETE");
+    expect(deletedUrl).toContain("/drive/v1/files/ft-1");
+    expect(deletedUrl).toContain("type=file");
   });
 
   it("飞书 code!==0 抛带 code 的错误", async () => {

@@ -117,6 +117,25 @@ export async function uploadDocx(
   return json.data.file_token;
 }
 
+/**
+ * 删除云空间文件。导入完成后清理上传的中间 docx 素材，只保留生成的在线文档。
+ * type 对应飞书文件类型，上传的 docx 即普通文件 "file"。
+ */
+export async function deleteFile(
+  cfg: ResolvedFeishuConfig,
+  fileToken: string,
+  type = "file",
+): Promise<void> {
+  const res = await authedFetch(
+    cfg,
+    () => ({
+      url: `${cfg.baseUrl}/open-apis/drive/v1/files/${encodeURIComponent(fileToken)}?type=${encodeURIComponent(type)}`,
+      init: { method: "DELETE" },
+    }),
+  );
+  await parseFeishu<{ data?: unknown }>(res, "删除素材");
+}
+
 /** 提交 docx → 在线文档 导入任务，返回 ticket。 */
 export async function createImportTask(
   cfg: ResolvedFeishuConfig,
