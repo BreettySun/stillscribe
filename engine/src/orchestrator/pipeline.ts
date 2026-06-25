@@ -161,10 +161,11 @@ export async function runDocx(
   article: Article,
   taskDir: TaskDir,
   onStep?: (progress: StepProgress) => void | Promise<void>,
+  sourceUrl?: string,
 ): Promise<DocxResult> {
   await onStep?.({ step: "docx", message: "程序化生成 docx…" });
   mkdirSync(path.dirname(taskDir.docx), { recursive: true }); // 幂等：恢复/重导时确保 article/ 存在
-  const { buffer, warnings } = await buildDocx(article, taskDir.hd);
+  const { buffer, warnings } = await buildDocx(article, taskDir.hd, { sourceUrl });
   await writeFile(taskDir.docx, buffer); // 落盘留底
   return { docxPath: taskDir.docx, buffer, warnings };
 }

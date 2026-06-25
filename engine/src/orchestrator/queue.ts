@@ -183,7 +183,12 @@ export class Orchestrator {
     this.bus.emit({ type: "progress", taskId: id, progress: { step: "docx", message: "生成 docx…" } });
     try {
       const td = new TaskDir(task.workDir);
-      const { docxPath, buffer, warnings } = await runDocx(task.article, td);
+      const { docxPath, buffer, warnings } = await runDocx(
+        task.article,
+        td,
+        undefined,
+        task.params.url,
+      );
       this.store.update(id, { outputDocx: docxPath, currentStep: null });
 
       let feishuUrl: string | undefined;

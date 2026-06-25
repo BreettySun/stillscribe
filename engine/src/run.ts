@@ -102,8 +102,11 @@ async function runPipeline(cli: Cli): Promise<void> {
     return;
   }
   const article = JSON.parse(await readFile(td.articleJson, "utf-8")) as Article;
-  const { docxPath, warnings } = await runDocx(article, td, ({ message }) =>
-    console.error(`[docx] ${message ?? ""}`),
+  const { docxPath, warnings } = await runDocx(
+    article,
+    td,
+    ({ message }) => console.error(`[docx] ${message ?? ""}`),
+    cli.url,
   );
   for (const w of warnings) console.error(`     [warn] ${w}`);
   console.error(`\n✅ 当前阶段完成（至 M8）。docx 可手动「导入 Word」进飞书: ${docxPath}`);
