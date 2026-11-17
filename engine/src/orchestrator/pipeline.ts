@@ -2,16 +2,24 @@
  * 可复用流水线：把 run.ts 内联的 M2→M8 顺序逻辑抽出来，命令行(run.ts)与编排器(queue.ts)共用，
  * 杜绝两份"影子流程"。每步幂等、产物落盘、可单步重跑（CLAUDE.md 铁律 #7）。
  *
- * 边界：runToGrids 跑到"喂 AI 之前"（M2→M6）；runDocx 单独做 M8。
- * 这条缝正好是半自动(semi)的 awaiting_review 停顿点——grids 出来后等人工回填 article，再 export 出 docx。
+ * 边界：runToGrids 跑到"喂 AI 之前"（M2→M6）；runExport 单独做 M8（docx / Markdown / HTML）。
+ * 这条缝正好是半自动(semi)的 awaiting_review 停顿点——grids 出来后等人工回填 article，再 export 出文件。
  *
  * 取消：步与步之间用 ckCancel 检查 signal；同时把 signal 透传进模块（download/抽帧等），
  * 让长命令在中途收到 abort 即 SIGKILL 子进程立即中断，而非等命令跑完才响应。
  */
 import { mkdirSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { DEFAULTS, type Article, type StepProgress, type TaskParams } from "@shared/types";
+import {
+  DEFAULTS,
+  EXPORT_FORMATS,
+  type Article,
+  type ExportFormat,
+  type ExportOutputs,
+  type StepProgress,
+  type TaskParams,
+} from "@shared/types";
 import { TaskDir, matchFiles } from "../paths.ts";
 import { fetchVideoInfo, download } from "../modules/m2-download.ts";
 import { generateFrames } from "../modules/m3-frames.ts";
@@ -21,6 +29,9 @@ import { generateArticle, type GenerateResult } from "../modules/m7/index.ts";
 import type { GeminiClient } from "../modules/m7/geminiClient.ts";
 import type { AIImageSource } from "@shared/types";
 import { buildDocx } from "../modules/m8-docx.ts";
+import { buildExportDoc, copyExportImages, type ExportImage } from "../modules/m8-layout.ts";
+import { renderMarkdown } from "../modules/m8-markdown.ts";
+import { renderHtml } from "../modules/m8-html.ts";
 
 export interface PipelineHooks {
   /** 工作根目录（任务目录在其下创建）。 */
@@ -146,26 +157,85 @@ export async function runArticle(
   });
 }
 
-export interface DocxResult {
-  docxPath: string;
-  /** docx 二进制（buffer-first）：调用方可直接喂飞书导入，省去再次读盘（《飞书集成》§2）。 */
-  buffer: Buffer;
+export interface ExportOptions {
+  /** 要导出的格式；省略 = 全部。 */
+  formats?: readonly ExportFormat[];
+  /** 来源视频 URL（写入各格式的元信息）。 */
+  sourceUrl?: string;
+  /** article.meta.titles 为空时的兜底标题（一般传视频标题）。 */
+  fallbackTitle?: string;
+}
+
+export interface ExportRunResult {
+  /** 本次导出的各格式主产物路径。 */
+  outputs: ExportOutputs;
+  /** 非致命问题（缺图等），已去重。 */
   warnings: string[];
 }
 
 /**
- * M8：读 Article 程序化生成 docx。返回内存 buffer + 落盘留底路径。
- * buffer-first：buffer 既写盘留底（兜底/本地下载），也供 M9 直接喂飞书导入。幂等由调用方决定。
+ * M8：读 Article，程序化生成本地文件，全部落在 article/ 下。每次调用整体重写（覆盖旧产物）。
+ *   docx     → article_final.docx（配图内嵌）
+ *   markdown → article.md + images/
+ *   html     → article.html + images/，另出图片内嵌的 article.standalone.html
+ * Markdown 与 HTML 共用同一份 images/（从 01_hd 原样拷贝，不再编码——铁律 #2）。
  */
-export async function runDocx(
+export async function runExport(
   article: Article,
   taskDir: TaskDir,
+  opts: ExportOptions = {},
   onStep?: (progress: StepProgress) => void | Promise<void>,
-  sourceUrl?: string,
-): Promise<DocxResult> {
-  await onStep?.({ step: "docx", message: "程序化生成 docx…" });
-  mkdirSync(path.dirname(taskDir.docx), { recursive: true }); // 幂等：恢复/重导时确保 article/ 存在
-  const { buffer, warnings } = await buildDocx(article, taskDir.hd, { sourceUrl });
-  await writeFile(taskDir.docx, buffer); // 落盘留底
-  return { docxPath: taskDir.docx, buffer, warnings };
+): Promise<ExportRunResult> {
+  const formats = new Set<ExportFormat>(opts.formats ?? EXPORT_FORMATS);
+  const outputs: ExportOutputs = {};
+  const warnings = new Set<string>();
+  mkdirSync(taskDir.articleDir, { recursive: true }); // 幂等：恢复/重导时确保 article/ 存在
+
+  if (formats.has("docx")) {
+    await onStep?.({ step: "export", message: "生成 docx…" });
+    const built = await buildDocx(article, taskDir.hd, { sourceUrl: opts.sourceUrl });
+    await writeFile(taskDir.docx, built.buffer);
+    for (const w of built.warnings) warnings.add(w);
+    outputs.docx = taskDir.docx;
+  }
+
+  if (formats.has("markdown") || formats.has("html")) {
+    await onStep?.({ step: "export", message: "整理配图…" });
+    const doc = buildExportDoc(article, {
+      ...(opts.sourceUrl ? { sourceUrl: opts.sourceUrl } : {}),
+      ...(opts.fallbackTitle ? { fallbackTitle: opts.fallbackTitle } : {}),
+    });
+    const copied = await copyExportImages(doc, taskDir.hd, taskDir.exportImages);
+    for (const w of copied.warnings) warnings.add(w);
+
+    if (formats.has("markdown")) {
+      await onStep?.({ step: "export", message: "生成 Markdown…" });
+      await writeFile(taskDir.markdown, renderMarkdown(doc, { missing: copied.missing }), "utf-8");
+      outputs.markdown = taskDir.markdown;
+    }
+
+    if (formats.has("html")) {
+      await onStep?.({ step: "export", message: "生成 HTML…" });
+      await writeFile(taskDir.html, renderHtml(doc, { missing: copied.missing }), "utf-8");
+
+      // 单文件版：把已拷出的配图读成 data URI 内嵌（原字节 base64，不再编码）。
+      const dataUris = new Map<string, string>();
+      for (const { image } of doc.sections) {
+        if (copied.missing.has(image.fileName)) continue;
+        const bytes = await readFile(path.join(taskDir.exportImages, image.fileName));
+        dataUris.set(image.fileName, `data:image/jpeg;base64,${bytes.toString("base64")}`);
+      }
+      await writeFile(
+        taskDir.htmlStandalone,
+        renderHtml(doc, {
+          missing: copied.missing,
+          imageSrc: (image: ExportImage) => dataUris.get(image.fileName) ?? "",
+        }),
+        "utf-8",
+      );
+      outputs.html = taskDir.html;
+    }
+  }
+
+  return { outputs, warnings: [...warnings] };
 }

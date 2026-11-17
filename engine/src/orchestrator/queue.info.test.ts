@@ -7,7 +7,7 @@ vi.mock("./pipeline.ts", () => ({
     await hooks.onInfo?.({ workDir: "/tmp/wd", videoTitle: "我的视频标题" });
     return { taskDir: {}, videoId: "vid", videoTitle: "我的视频标题", frames: 0, grids: [] };
   }),
-  runDocx: vi.fn(),
+  runExport: vi.fn(),
 }));
 
 const { Orchestrator } = await import("./queue.ts");

@@ -1,8 +1,8 @@
 /**
  * P1 命令行入口：tsx src/run.ts <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--work-root <dir>]
  *
- * 当前打通到 M8（M2 下载 → M3 出帧 → M5 去重 → M6 宫格图 → M8 docx）。
- * M7（文章生成）暂由 Claude 读宫格图+字幕生成 article.json 回填，故 M8 依赖其存在。
+ * 打通 M2 下载 → M3 出帧 → M5 去重 → M6 宫格图 → M7 文章 → M8 导出（docx / Markdown / HTML）。
+ * M7：--mode auto 调 Gemini 生成 article.json；默认 semi 由人工回填 article.json 后重跑续接 M8。
  * 每步幂等、产物落盘，可单步重跑（CLAUDE.md 铁律 #7）。
  */
 import { existsSync } from "node:fs";
@@ -11,7 +11,7 @@ import path from "node:path";
 import { DEFAULTS, type Article, type ArticleMode, type TaskParams, type VideoQuality } from "@shared/types";
 import { loadDotEnv } from "./env.ts";
 import { resolveCookiesFile } from "./paths.ts";
-import { runToGrids, runDocx, runArticle } from "./orchestrator/pipeline.ts";
+import { runToGrids, runExport, runArticle } from "./orchestrator/pipeline.ts";
 import { createGeminiClient } from "./modules/m7/geminiClient.ts";
 import { resolveAIConfig } from "./modules/m7/config.ts";
 
@@ -97,19 +97,20 @@ async function runPipeline(cli: Cli): Promise<void> {
     return;
   }
 
-  if (existsSync(td.docx)) {
-    console.error(`[docx] 已存在，跳过（幂等）: ${td.docx}`);
+  if ([td.docx, td.markdown, td.html].every((f) => existsSync(f))) {
+    console.error(`[export] 导出文件已存在，跳过（幂等）: ${td.articleDir}`);
     return;
   }
   const article = JSON.parse(await readFile(td.articleJson, "utf-8")) as Article;
-  const { docxPath, warnings } = await runDocx(
+  const { outputs, warnings } = await runExport(
     article,
     td,
-    ({ message }) => console.error(`[docx] ${message ?? ""}`),
-    cli.url,
+    { sourceUrl: cli.url, fallbackTitle: videoTitle },
+    ({ message }) => console.error(`[export] ${message ?? ""}`),
   );
   for (const w of warnings) console.error(`     [warn] ${w}`);
-  console.error(`\n✅ 当前阶段完成（至 M8）。docx 可手动「导入 Word」进飞书: ${docxPath}`);
+  console.error("\n✅ 导出完成：");
+  for (const [format, file] of Object.entries(outputs)) console.error(`     ${format}: ${file}`);
 }
 
 async function main(): Promise<void> {

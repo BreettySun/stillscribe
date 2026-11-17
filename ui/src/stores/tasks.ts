@@ -8,6 +8,8 @@ import type {
 	Article,
 	BatchSubmit,
 	EngineEvent,
+	ExportFormat,
+	ExportResult,
 	StepProgress,
 	SwapImageRequest,
 	Task,
@@ -90,11 +92,7 @@ export const useTasksStore = defineStore("tasks", () => {
 				patch(e.taskId, { status: "awaiting_review", article: e.article });
 				break;
 			case "completed":
-				patch(e.taskId, {
-					status: "completed",
-					outputDocx: e.outputDocx,
-					...(e.feishuUrl ? { feishuUrl: e.feishuUrl } : {}),
-				});
+				patch(e.taskId, { status: "completed", outputs: e.outputs });
 				notify("任务完成", titleOf(e.taskId));
 				break;
 			case "failed":
@@ -165,24 +163,20 @@ export const useTasksStore = defineStore("tasks", () => {
 	async function swap(id: TaskId, req: SwapImageRequest): Promise<void> {
 		upsert(await api.swap(id, req));
 	}
-	async function exportDocx(id: TaskId): Promise<string> {
-		const { docxPath } = await api.exportDocx(id, "local");
-		await refresh(id);
-		return docxPath;
+	/** 导出本地文件（省略 formats = 全部格式）；失败时引擎把任务落 failed，这里仍刷新以同步状态。 */
+	async function exportArticle(
+		id: TaskId,
+		formats?: ExportFormat[],
+	): Promise<ExportResult> {
+		try {
+			return await api.exportArticle(id, formats);
+		} finally {
+			await refresh(id).catch(() => {});
+		}
 	}
-	/** 导入飞书：上传 docx → 导入 → 返回在线文档链接（失败抛错，本地 docx 已留底）。 */
-	async function importToFeishu(id: TaskId): Promise<string | undefined> {
-		const { feishuUrl } = await api.exportDocx(id, "feishu");
-		await refresh(id);
-		return feishuUrl;
-	}
-	/** 返回上一步（docx 结果页/docx 失败 → 校对页）：completed/failed → awaiting_review。 */
+	/** 返回上一步（结果页/导出失败 → 校对页）：completed/failed → awaiting_review。 */
 	async function reopenReview(id: TaskId): Promise<void> {
 		upsert(await api.reopen(id));
-	}
-	/** 返回上一步（飞书失败页 → docx 结果页）：failed → completed。 */
-	async function reopenDocxResult(id: TaskId): Promise<void> {
-		upsert(await api.reopenDocx(id));
 	}
 
 	return {
@@ -202,9 +196,7 @@ export const useTasksStore = defineStore("tasks", () => {
 		remove,
 		saveArticle,
 		swap,
-		exportDocx,
-		importToFeishu,
+		exportArticle,
 		reopenReview,
-		reopenDocxResult,
 	};
 });

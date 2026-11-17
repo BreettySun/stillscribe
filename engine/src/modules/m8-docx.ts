@@ -1,14 +1,14 @@
 /**
  * M8 文档组装：读 M7 的 Article，用 dolanmiu `docx` 程序化一次性生成 article_final.docx。
  *
- * 版式对齐 template.md（飞书云文档成品格式）：
+ * 版式对齐 template.md（交稿用的成品格式）：
  * 顶部元信息块（加粗标签 + 值）：
  *   Source / Title（保留全部候选，一行一个）/ Keywords / Description /
  *   Cover: 420*315, jpg（纯文字标注占位，不嵌图）/ Content（引言：配图 + 正文，无编号标题）。
  * 其后为编号小节：加粗编号小标题（普通段落，非 Heading）→ HD 配图（等比居中，源取 01_hd 1280×720 jpg）→ 正文分段。
  * 引言页约定为 pages[0]（M7 prompt 保证首页为 Intro），其配图嵌在 Content 文字上方、不加编号标题。
  *
- * 铁律 #4：ArticleNotes（中文说明 / CoT）绝不进 docx —— 本模块直接忽略 article.notes。
+ * 铁律 #4：ArticleNotes（中文说明 / CoT）绝不进任何导出文件 —— 本模块直接忽略 article.notes。
  * 缺图：记 warning、跳过该图、不中断。
  */
 import { readFile } from "node:fs/promises";
@@ -96,13 +96,13 @@ async function readImageIfExists(p: string): Promise<Buffer | null> {
 }
 
 export interface DocxBuild {
-	/** docx 二进制内容（buffer-first：既可落盘留底，也可直接喂飞书导入，见《飞书集成》§2）。 */
+	/** docx 二进制内容。 */
 	buffer: Buffer;
 	/** 缺图清单。 */
 	warnings: string[];
 }
 
-/** 生成 docx，返回内存 buffer + warnings（缺图清单）。落盘与否由调用方（runDocx）决定。 */
+/** 生成 docx，返回内存 buffer + warnings（缺图清单）。落盘由调用方（runExport）负责。 */
 export async function buildDocx(
 	article: Article,
 	hdDir: string,

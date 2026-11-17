@@ -117,4 +117,15 @@ export class TaskDir {
   get articleJson(): string { return path.join(this.articleDir, "article.json"); }
   get promptTxt(): string { return path.join(this.articleDir, "prompt.txt"); }
   get docx(): string { return path.join(this.articleDir, "article_final.docx"); }
+  /** Markdown 导出：相对引用 exportImages 下的配图。 */
+  get markdown(): string { return path.join(this.articleDir, "article.md"); }
+  /** HTML 导出：相对引用 exportImages 下的配图。 */
+  get html(): string { return path.join(this.articleDir, "article.html"); }
+  /** HTML 单文件版：配图以 data URI 内嵌，便于单独发给他人预览。 */
+  get htmlStandalone(): string { return path.join(this.articleDir, "article.standalone.html"); }
+  /** Markdown/HTML 共用的配图目录（从 01_hd 原样拷贝并按页重命名；每次导出重建）。 */
+  get exportImages(): string { return path.join(this.articleDir, EXPORT_IMAGES_DIRNAME); }
 }
+
+/** article/ 下的配图子目录名，也是 Markdown/HTML 里相对引用的前缀。 */
+export const EXPORT_IMAGES_DIRNAME = "images";

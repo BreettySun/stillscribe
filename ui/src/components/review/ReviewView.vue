@@ -3,7 +3,7 @@
  * awaiting_review：两种形态——
  *  · 已有 article（已回填/换图后）：逐页校对 + 换图(FramePicker) 为主，回填工具收进折叠区。
  *  · 尚无 article（semi 模式的常态，引擎停在 grids 等人工回填）：宫格图 + JSON 回填为主，置顶展示。
- * 正文只渲染 body/subhead；notes/中文 CoT 仅折叠展示，绝不进正文/导出（CLAUDE.md 铁律 #4）。
+ * 正文只渲染 body/subhead；notes/中文 CoT 仅折叠展示，绝不进正文/导出文件（CLAUDE.md 铁律 #4）。
  */
 import { computed, onMounted, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
@@ -74,8 +74,9 @@ async function onSaveArticle(next: Article): Promise<void> {
 async function onExport(): Promise<void> {
 	exporting.value = true;
 	try {
-		await store.exportDocx(props.task.id);
-		message.success("docx 生成完成");
+		const { warnings } = await store.exportArticle(props.task.id);
+		if (warnings.length > 0) message.warning(`导出完成，但有 ${warnings.length} 处问题：${warnings[0]}`);
+		else message.success("导出完成");
 	} catch (e) {
 		message.error(e instanceof Error ? e.message : String(e));
 	} finally {
@@ -107,7 +108,7 @@ async function onExport(): Promise<void> {
 				:loading="exporting"
 				:disabled="!hasArticle"
 				@click="onExport">
-				✓ 确认并生成 docx
+				✓ 确认并导出
 			</n-button>
 		</div>
 
@@ -142,7 +143,7 @@ async function onExport(): Promise<void> {
 			<n-collapse>
 				<n-collapse-item
 					v-if="article!.notes"
-					title="说明 / CoT（仅参考 · 不进 docx）"
+					title="说明 / CoT（仅参考 · 不进导出文件）"
 					name="notes">
 					<p
 						v-if="article!.notes.frameworkRationale"

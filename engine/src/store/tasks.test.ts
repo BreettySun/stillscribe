@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import Database from "better-sqlite3";
 import type { TaskParams } from "@shared/types";
 import { TaskStore } from "./tasks.ts";
 
@@ -49,6 +53,44 @@ describe("TaskStore", () => {
     const cleared = s.update(t.id, { error: null, currentStep: null });
     expect(cleared.error).toBeUndefined();
     expect(cleared.currentStep).toBeUndefined();
+  });
+
+  it("outputs 往返；未传 outputs 的 update 不清空它", () => {
+    const s = freshStore();
+    const t = s.create(PARAMS);
+    const outputs = { docx: "/w/a.docx", markdown: "/w/a.md", html: "/w/a.html" };
+    expect(s.update(t.id, { outputs }).outputs).toEqual(outputs);
+    expect(s.update(t.id, { status: "completed" }).outputs).toEqual(outputs);
+  });
+
+  it("旧库迁移：补 outputs 列，遗留的 outputDocx 读成 outputs.docx", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "diggo-store-"));
+    const file = path.join(dir, "tasks.db");
+    // 按旧版表结构（含 outputDocx / feishuUrl，无 outputs）造一条已完成的任务。
+    const old = new Database(file);
+    old.exec(`
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY, params TEXT NOT NULL, status TEXT NOT NULL, currentStep TEXT,
+        videoTitle TEXT, workDir TEXT NOT NULL DEFAULT '', article TEXT, outputDocx TEXT,
+        feishuUrl TEXT, error TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+      );
+    `);
+    old
+      .prepare(
+        `INSERT INTO tasks (id, params, status, workDir, outputDocx, feishuUrl, createdAt, updatedAt)
+         VALUES ('t1', ?, 'completed', '/w', '/w/article/article_final.docx', 'https://example/doc', 'now', 'now')`,
+      )
+      .run(JSON.stringify(PARAMS));
+    old.close();
+
+    const s = new TaskStore(file);
+    const t = s.get("t1")!;
+    expect(t.outputs).toEqual({ docx: "/w/article/article_final.docx" });
+    expect(t).not.toHaveProperty("feishuUrl");
+    // 迁移后可正常写入新结构。
+    const u = s.update("t1", { outputs: { ...t.outputs, markdown: "/w/article/article.md" } });
+    expect(u.outputs).toEqual({ docx: "/w/article/article_final.docx", markdown: "/w/article/article.md" });
+    s.close();
   });
 
   it("update 不存在的 id 抛错", () => {

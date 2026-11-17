@@ -13,7 +13,7 @@ const STEPS: { key: PipelineStep; label: string }[] = [
 	{ key: "dedup", label: "去重" },
 	{ key: "grids", label: "宫格图" },
 	{ key: "article", label: "文章" },
-	{ key: "docx", label: "生成 docx" },
+	{ key: "export", label: "导出" },
 ];
 const ORDER = STEPS.map((s) => s.key);
 

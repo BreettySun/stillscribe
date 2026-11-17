@@ -13,8 +13,6 @@ export type { ThemeMode };
 export const useSettingsStore = defineStore("settings", () => {
   const mode = ref<ThemeMode>(UI_DEFAULTS.theme);
   const cookieBrowser = ref<CookieBrowser>(UI_DEFAULTS.cookieBrowser);
-  /** 飞书凭证是否已在引擎侧配置（决定是否显示「导入飞书」）。只读探测，绝不含明文。 */
-  const feishuConfigured = ref(false);
 
   // 系统偏好（matchMedia 在渲染进程恒存在；监听变化以便 auto 实时跟随）。
   const mql = window.matchMedia("(prefers-color-scheme: dark)");
@@ -34,11 +32,6 @@ export const useSettingsStore = defineStore("settings", () => {
     } catch {
       /* 引擎未就绪：保持默认 */
     }
-    try {
-      feishuConfigured.value = (await api.getFeishuSettings()).configured;
-    } catch {
-      feishuConfigured.value = false;
-    }
   }
 
   /** 切换主题并即时写回引擎（fire-and-forget，失败不阻塞 UI）。 */
@@ -53,5 +46,5 @@ export const useSettingsStore = defineStore("settings", () => {
     void api.saveSettings({ cookieBrowser: b }).catch(() => {});
   }
 
-  return { mode, isDark, cookieBrowser, feishuConfigured, load, setMode, setCookieBrowser };
+  return { mode, isDark, cookieBrowser, load, setMode, setCookieBrowser };
 });

@@ -6,16 +6,24 @@
  * 注：批次间最小时间间隔(minBatchIntervalMs)首版暂未强制（会让开发/测试无法连续提交）——留待后续按真实风险落参数。
  *
  * 状态机：queued → running → (awaiting_review | failed | canceled)
- *         awaiting_review → running(导出 docx) → completed
+ *         awaiting_review → running(导出) → completed
+ *         completed → running(重新导出) → completed
  *         failed/canceled → queued（重试）
- * 半自动(semi)：runToGrids 完成即停在 awaiting_review，等人工回填 article 后再 exportDocx。
+ * 半自动(semi)：runToGrids 完成即停在 awaiting_review，等人工回填 article 后再 exportArticle。
  * 全自动(auto)：runToGrids 后直接调 Gemini(M7) 生成 article 草稿再进 awaiting_review（仍让人工校对/换图）；
  *               缺 Key / API 失败则降级——不让任务失败，照样进 awaiting_review 让人工接手（AI 集成文档 §6）。
  */
-import type { ExportTarget, SwapImageRequest, Task, TaskParams, TaskStatus } from "@shared/types";
+import {
+  EXPORT_FORMATS,
+  type ExportFormat,
+  type ExportResult,
+  type SwapImageRequest,
+  type Task,
+  type TaskParams,
+  type TaskStatus,
+} from "@shared/types";
 import { TaskDir, resolveCookiesFile } from "../paths.ts";
-import { runToGrids, runDocx, runArticle, type GridsResult } from "./pipeline.ts";
-import { importDocxToFeishu } from "../modules/m9-feishu/index.ts";
+import { runToGrids, runExport, runArticle, type GridsResult } from "./pipeline.ts";
 import { resolveAIConfig } from "../modules/m7/config.ts";
 import { createGeminiClient } from "../modules/m7/geminiClient.ts";
 import type { EventBus } from "./events.ts";
@@ -25,9 +33,8 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   queued: ["running", "canceled"],
   running: ["awaiting_review", "completed", "failed", "canceled"],
   awaiting_review: ["running", "completed", "failed", "canceled"],
-  completed: ["awaiting_review"], // 返回上一步：docx/飞书结果页回校对
-  failed: ["queued", "awaiting_review", "completed"], // queued=重试整条流水线；awaiting_review=docx 失败回校对；completed=飞书失败回 docx 结果页
-
+  completed: ["awaiting_review", "running"], // awaiting_review=返回校对；running=原样重新导出
+  failed: ["queued", "awaiting_review"], // queued=重试整条流水线；awaiting_review=导出失败回校对
   canceled: ["queued"],
 };
 
@@ -122,32 +129,18 @@ export class Orchestrator {
 
   /**
    * 返回上一步（结果页/失败页 → 校对页）：completed | failed → awaiting_review。
-   * 清 feishuUrl（回校对意味着 article 可能变、旧导入作废）与 error（失败后回退则作废旧错误）；
-   * outputDocx 保留（下次导出覆盖同路径）。导出/飞书失败时 article 仍在，可直接回校对重试，无需重跑整条流水线。
+   * 清 error（失败后回退则作废旧错误）；outputs 保留（下次导出覆盖同路径）。
+   * 导出失败时 article 仍在，可直接回校对重试，无需重跑整条流水线。
    */
   reopenReview(id: string): Task {
     const task = this.store.get(id);
     if (!task) throw new Error(`任务不存在: ${id}`);
     if (!task.article) throw new Error("任务尚无 article，无法返回校对");
-    this.store.update(id, { currentStep: null, feishuUrl: null, error: null });
+    this.store.update(id, { currentStep: null, error: null });
     this.transition(id, "awaiting_review");
     const after = this.store.get(id)!;
     this.bus.emit({ type: "awaiting_review", taskId: id, article: after.article! });
     return after;
-  }
-
-  /**
-   * 返回上一步（飞书失败页 → docx 结果页）：failed → completed。
-   * docx 已留底（outputDocx 在），仅飞书子步失败；回到 docx 结果页即可重试导入。清 error/feishuUrl。
-   */
-  reopenDocxResult(id: string): Task {
-    const task = this.store.get(id);
-    if (!task) throw new Error(`任务不存在: ${id}`);
-    if (!task.outputDocx) throw new Error("任务无 docx 产物，无法返回结果页");
-    this.store.update(id, { currentStep: null, feishuUrl: null, error: null });
-    this.transition(id, "completed");
-    this.bus.emit({ type: "completed", taskId: id, outputDocx: task.outputDocx });
-    return this.store.get(id)!;
   }
 
   /** 换图：改某页配图时间戳。 */
@@ -165,52 +158,46 @@ export class Orchestrator {
   }
 
   /**
-   * 导出（M8 docx + 可选 M9 飞书）：awaiting_review → running → completed。
-   * target="local"：只生成 docx（落盘留底）。
-   * target="feishu"：生成 docx 后用其 buffer 上传飞书并返回 feishuUrl；失败落 failed，本地 docx 仍留底兜底。
+   * 导出（M8）：awaiting_review | completed → running → completed。
+   * 产物全部是本地文件（docx / Markdown / HTML），落在任务目录 article/ 下；省略 formats = 全部格式。
+   * 失败落 failed（article 仍在，可回校对重试）。
    */
-  async exportDocx(
+  async exportArticle(
     id: string,
-    target: ExportTarget = "local",
-  ): Promise<{ docxPath: string; feishuUrl?: string; warnings: string[] }> {
+    formats: readonly ExportFormat[] = EXPORT_FORMATS,
+  ): Promise<ExportResult> {
     const task = this.store.get(id);
     if (!task) throw new Error(`任务不存在: ${id}`);
     if (!task.article) throw new Error("任务尚无 article，无法导出（semi 模式请先回填）");
     if (!task.workDir) throw new Error("任务无 workDir（下载/抽帧未完成？）");
+    if (task.status !== "awaiting_review" && task.status !== "completed") {
+      throw new Error(`仅校对中或已完成的任务可导出，当前: ${task.status}`);
+    }
 
     this.transition(id, "running");
-    this.store.update(id, { currentStep: "docx" });
-    this.bus.emit({ type: "progress", taskId: id, progress: { step: "docx", message: "生成 docx…" } });
+    this.store.update(id, { currentStep: "export", error: null });
     try {
-      const td = new TaskDir(task.workDir);
-      const { docxPath, buffer, warnings } = await runDocx(
+      const { outputs, warnings } = await runExport(
         task.article,
-        td,
-        undefined,
-        task.params.url,
+        new TaskDir(task.workDir),
+        {
+          formats,
+          sourceUrl: task.params.url,
+          ...(task.videoTitle ? { fallbackTitle: task.videoTitle } : {}),
+        },
+        (progress) => {
+          this.bus.emit({ type: "progress", taskId: id, progress });
+        },
       );
-      this.store.update(id, { outputDocx: docxPath, currentStep: null });
-
-      let feishuUrl: string | undefined;
-      if (target === "feishu") {
-        this.store.update(id, { currentStep: "publish" });
-        const emitPublish = (message: string) => {
-          this.store.update(id, { currentStep: "publish" });
-          this.bus.emit({ type: "progress", taskId: id, progress: { step: "publish", message } });
-        };
-        emitPublish("上传到飞书…");
-        const fileName = `${task.videoTitle ?? task.id}.docx`;
-        const result = await importDocxToFeishu(buffer, { fileName, onProgress: emitPublish });
-        feishuUrl = result.url;
-        this.store.update(id, { feishuUrl, currentStep: null });
-      }
-
+      // 只导出部分格式时，保留其余格式上次的产物路径。
+      const merged = { ...task.outputs, ...outputs };
+      this.store.update(id, { outputs: merged, currentStep: null });
       this.transition(id, "completed");
-      this.bus.emit({ type: "completed", taskId: id, outputDocx: docxPath, ...(feishuUrl ? { feishuUrl } : {}) });
-      return { docxPath, ...(feishuUrl ? { feishuUrl } : {}), warnings };
+      this.bus.emit({ type: "completed", taskId: id, outputs: merged });
+      return { outputs, warnings };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.store.update(id, { error: msg });
+      this.store.update(id, { error: msg, currentStep: null });
       this.transition(id, "failed");
       this.bus.emit({ type: "failed", taskId: id, error: msg });
       throw err;

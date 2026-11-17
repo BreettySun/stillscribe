@@ -1,38 +1,32 @@
 <script setup lang="ts">
-/** 终态：completed（打开 docx / 重新生成）、failed（错误 + 重试）、canceled（重新提交）。 */
-import { computed, ref, watch } from "vue";
+/** 终态：completed（导出文件列表 / 重新导出）、failed（错误 + 返回校对）、canceled（重新提交）。 */
+import { computed, ref } from "vue";
 import { useMessage } from "naive-ui";
 import type { Task } from "@shared/types";
 import { useTasksStore } from "../../stores/tasks";
-import { useSettingsStore } from "../../stores/settings";
 import { isDesktop, revealInFolder } from "../../bridge";
+import { listOutputs } from "../../exportFormats";
 
 const props = defineProps<{ task: Task }>();
 const store = useTasksStore();
-const settings = useSettingsStore();
 const message = useMessage();
 
 const exporting = ref(false);
-const importing = ref(false);
 const goingBack = ref(false);
-/** 飞书结果页「返回上一步」→ docx 结果页：纯 UI 折叠飞书链接（不动 task.feishuUrl）。 */
-const hideFeishu = ref(false);
-const showFeishuLink = computed(
-	() => !!props.task.feishuUrl && !hideFeishu.value,
-);
-// 切换任务时复位（否则换任务后残留上一个的折叠态）。
-watch(
-	() => props.task.id,
-	() => {
-		hideFeishu.value = false;
-	},
-);
 
-async function onRegenerate(): Promise<void> {
+/** 已导出的文件（按格式），全部在任务目录 article/ 下。 */
+const outputs = computed(() => listOutputs(props.task.outputs));
+
+/** 原样重新导出全部格式（覆盖同路径；文件被误删或想刷新时用）。 */
+async function onReexport(): Promise<void> {
 	exporting.value = true;
 	try {
-		await store.exportDocx(props.task.id);
-		message.success("已重新生成 docx");
+		const { warnings } = await store.exportArticle(props.task.id);
+		if (warnings.length > 0) {
+			message.warning(`已重新导出，但有 ${warnings.length} 处问题：${warnings[0]}`);
+		} else {
+			message.success("已重新导出");
+		}
 	} catch (e) {
 		message.error(e instanceof Error ? e.message : String(e));
 	} finally {
@@ -40,37 +34,11 @@ async function onRegenerate(): Promise<void> {
 	}
 }
 
-async function onImportFeishu(): Promise<void> {
-	importing.value = true;
-	hideFeishu.value = false; // 重新导入后正常展示新链接
-	try {
-		const url = await store.importToFeishu(props.task.id);
-		message.success(url ? "已导入飞书" : "导入完成");
-	} catch (e) {
-		message.error(e instanceof Error ? e.message : String(e));
-	} finally {
-		importing.value = false;
-	}
-}
-
-/**
- * 返回上一步（按当前所处步派发）：
- * - 飞书结果页(completed+link) → docx 结果页：仅折叠链接。
- * - 飞书失败页(failed + 有 docx 留底) → docx 结果页：failed → completed。
- * - docx 结果页 / docx 阶段失败 → 校对页：→ awaiting_review。
- */
+/** 返回上一步：结果页 / 导出失败页 → 校对页（引擎回迁到 awaiting_review，article 保留）。 */
 async function onBack(): Promise<void> {
-	if (showFeishuLink.value) {
-		hideFeishu.value = true; // 飞书 → docx（仅折叠链接）
-		return;
-	}
 	goingBack.value = true;
 	try {
-		if (props.task.status === "failed" && props.task.outputDocx) {
-			await store.reopenDocxResult(props.task.id); // 飞书失败 → docx 结果页
-		} else {
-			await store.reopenReview(props.task.id); // docx → 校对（引擎回迁状态）
-		}
+		await store.reopenReview(props.task.id);
 	} catch (e) {
 		message.error(e instanceof Error ? e.message : String(e));
 	} finally {
@@ -101,44 +69,35 @@ async function onResubmit(): Promise<void> {
 				type="success"
 				title="任务已完成" />
 			<n-card
-				v-if="task.outputDocx"
+				v-if="outputs.length > 0"
 				size="small"
-				title="输出 docx">
-				<p class="mono">{{ task.outputDocx }}</p>
-				<n-space>
-					<n-button
-						v-if="isDesktop"
-						@click="revealInFolder(task.outputDocx!)">
-						在 Finder 中显示
-					</n-button>
+				title="导出文件">
+				<n-space
+					vertical
+					:size="12">
+					<div
+						v-for="row in outputs"
+						:key="row.format"
+						class="output">
+						<div class="output-text">
+							<div>
+								<span class="output-label">{{ row.label }}</span>
+								<span class="output-hint">{{ row.hint }}</span>
+							</div>
+							<p class="mono">{{ row.path }}</p>
+						</div>
+						<n-button
+							v-if="isDesktop"
+							size="small"
+							@click="revealInFolder(row.path)">
+							在 Finder 中显示
+						</n-button>
+					</div>
 					<n-button
 						tertiary
 						:loading="exporting"
-						@click="onRegenerate">
-						重新生成
-					</n-button>
-				</n-space>
-			</n-card>
-
-			<n-card
-				v-if="settings.feishuConfigured"
-				size="small"
-				title="飞书">
-				<n-space
-					vertical
-					:size="8">
-					<a
-						v-if="showFeishuLink"
-						:href="task.feishuUrl!"
-						target="_blank"
-						rel="noreferrer">
-						<n-button type="primary">在飞书中打开</n-button>
-					</a>
-					<n-button
-						v-else
-						:loading="importing"
-						@click="onImportFeishu">
-						导入飞书
+						@click="onReexport">
+						重新导出
 					</n-button>
 				</n-space>
 			</n-card>
@@ -158,7 +117,7 @@ async function onResubmit(): Promise<void> {
 				{{ task.error }}
 			</n-alert>
 			<n-space>
-				<!-- 导出/飞书阶段失败：article 还在，回校对重试即可，无需重跑整条流水线 -->
+				<!-- 导出阶段失败：article 还在，回校对重试即可，无需重跑整条流水线 -->
 				<n-button
 					v-if="task.article"
 					:loading="goingBack"
@@ -183,7 +142,25 @@ async function onResubmit(): Promise<void> {
 	margin: 0;
 	font-size: 18px;
 }
+.output {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.output-text {
+	min-width: 0;
+}
+.output-label {
+	font-weight: 600;
+}
+.output-hint {
+	margin-left: 8px;
+	font-size: 12px;
+	opacity: 0.65;
+}
 .mono {
+	margin: 2px 0 0;
 	font-family: ui-monospace, "SF Mono", Menlo, monospace;
 	word-break: break-all;
 	font-size: 12px;

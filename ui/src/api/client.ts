@@ -6,9 +6,8 @@ import type {
 	AISettings,
 	Article,
 	BatchSubmit,
+	ExportFormat,
 	ExportResult,
-	ExportTarget,
-	FeishuSettings,
 	Frame,
 	GridList,
 	PromptTemplateInfo,
@@ -42,13 +41,9 @@ export const api = {
 			body: JSON.stringify(body),
 		}).then(parse<SubmitResult>),
 
-	/** 返回上一步：completed/failed → awaiting_review（保留 article，清 feishuUrl/error）。 */
+	/** 返回上一步：completed/failed → awaiting_review（保留 article，清 error）。 */
 	reopen: (id: string) =>
 		fetch(`${BASE}/tasks/${id}/reopen`, { method: "POST" }).then(parse<Task>),
-
-	/** 返回上一步（飞书失败 → docx 结果页）：failed → completed。 */
-	reopenDocx: (id: string) =>
-		fetch(`${BASE}/tasks/${id}/reopen-docx`, { method: "POST" }).then(parse<Task>),
 
 	cancel: (id: string) =>
 		fetch(`${BASE}/tasks/${id}/cancel`, { method: "POST" }).then(parse<Task>),
@@ -75,12 +70,12 @@ export const api = {
 			body: JSON.stringify(req),
 		}).then(parse<Task>),
 
-	/** 导出：target="local" 生成 docx；target="feishu" 导入飞书并返回 feishuUrl。 */
-	exportDocx: (id: string, target: ExportTarget = "local") =>
+	/** 导出本地文件（docx / Markdown / HTML）；省略 formats = 全部格式。 */
+	exportArticle: (id: string, formats?: ExportFormat[]) =>
 		fetch(`${BASE}/tasks/${id}/export`, {
 			method: "POST",
 			headers: JSON_HEADERS,
-			body: JSON.stringify({ target }),
+			body: JSON.stringify(formats ? { formats } : {}),
 		}).then(parse<ExportResult>),
 
 	getSettings: () => fetch(`${BASE}/settings`).then(parse<UISettings>),
@@ -93,10 +88,6 @@ export const api = {
 
 	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
 	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
-
-	/** 飞书导入状态（只读）：是否已配置凭证。凭证由引擎侧 engine/.env 配置。 */
-	getFeishuSettings: () =>
-		fetch(`${BASE}/settings/feishu`).then(parse<FeishuSettings>),
 
 	/** 默认提示词模板（只读）：建任务时展示/可编辑的底稿。 */
 	getPromptTemplate: () =>

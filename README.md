@@ -1,6 +1,6 @@
 # Diggo Press
 
-把 **YouTube 视频 → 图文文章** 的手工流程封装成纯桌面 macOS 应用。一条 URL 进去，自动完成下载、逐秒抽帧加水印、去重选帧、拼宫格图，再由 Gemini 生成结构化文章，最后程序化导出带配图的 `.docx`。
+把 **YouTube 视频 → 图文文章** 的手工流程封装成纯桌面 macOS 应用。一条 URL 进去，自动完成下载、逐秒抽帧加水印、去重选帧、拼宫格图，再由 Gemini 生成结构化文章，最后程序化导出带配图的本地文件：Word（`.docx`）、Markdown、HTML。
 
 > 形态：**Electron + Vue（UI）+ Node/TS 引擎（本地进程）**。重活全在引擎；UI 是薄客户端，两者通过本地 HTTP/SSE 通信。
 > 详细设计见 `[docs/](docs/)`（架构文档、开发计划、前端架构）；开发硬约束见 `[CLAUDE.md](CLAUDE.md)`。
@@ -9,16 +9,14 @@
 
 ## 处理流水线
 
-
-| 模块          | 职责                                                         | 工具       |
-| ----------- | ---------------------------------------------------------- | -------- |
-| **M2** 下载   | yt-dlp 取 mp4 + 英文字幕（人工/自动）转 srt                            | `yt-dlp` |
-| **M3** 帧生成  | 一趟 ffmpeg 同时产 640×360 + 水印 webp 全集 与 1280×720 HD 全集（无二次编码） | `ffmpeg` |
-| **M5** 去重   | sharp/phash 选代表帧，只产代表帧清单，逐秒全集不动（默认开启）                      | `sharp`  |
-| **M6** 宫格图  | ffmpeg `tile` 滤镜拼图，10×5/组，cell 320×180，喂 Gemini            | `ffmpeg` |
-| **M7** 文章   | Gemini → 结构化 JSON（`Article`），中文说明只进 `notes`                | Gemini   |
-| **M8** docx | `docx`(dolanmiu) 程序化生成，配图取 1280 HD 等比居中                    | `docx`   |
-
+| 模块          | 职责                                                                          | 工具     |
+| ------------- | ----------------------------------------------------------------------------- | -------- |
+| **M2** 下载   | yt-dlp 取 mp4 + 英文字幕（人工/自动）转 srt                                   | `yt-dlp` |
+| **M3** 帧生成 | 一趟 ffmpeg 同时产 640×360 + 水印 webp 全集 与 1280×720 HD 全集（无二次编码） | `ffmpeg` |
+| **M5** 去重   | sharp/phash 选代表帧，只产代表帧清单，逐秒全集不动（默认开启）                | `sharp`  |
+| **M6** 宫格图 | ffmpeg `tile` 滤镜拼图，10×5/组，cell 320×180，喂 Gemini                      | `ffmpeg` |
+| **M7** 文章   | Gemini → 结构化 JSON（`Article`），中文说明只进 `notes`                       | Gemini   |
+| **M8** 导出   | 程序化生成本地文件：docx / Markdown / HTML，配图取 1280 HD                    | `docx`   |
 
 每个模块**幂等、产物落盘、可单步重跑**——失败重试或从中间步骤恢复，无需从头再来。
 
@@ -42,6 +40,17 @@
 ```
 
 工作目录产物（`work/<任务ID_标题>/`，不进 git）：`source/`、`01_hd/`、`02_webp/`、`03_grids/`、`article/`、`task.json`。
+
+导出文件全部落在 `article/` 下：
+
+| 文件                      | 说明                                                          |
+| ------------------------- | ------------------------------------------------------------- |
+| `article_final.docx`      | Word，配图内嵌                                                |
+| `article.md` + `images/`  | Markdown，标题 / description / 关键词在 front matter，配图相对引用 |
+| `article.html` + `images/` | 完整 HTML 文档，SEO 信息在 `<head>`                           |
+| `article.standalone.html` | 图片内嵌的单文件 HTML，方便直接发给别人预览                   |
+
+`images/` 里的配图按「页序号-小标题」命名（如 `01-grand-entrance.jpg`），可直接上传到 CMS。
 
 ---
 
@@ -68,10 +77,10 @@ pnpm --filter @diggo/engine setup-tools
 
 ```bash
 cd engine
-pnpm run <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--threshold N] [--work-root <dir>]
+pnpm run <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--threshold N] [--mode auto|semi] [--work-root <dir>]
 ```
 
-打通 M2 → M3 → M5 → M6 → M8。M7（文章生成）当前由人工/Claude 读宫格图 + 字幕生成 `article.json` 回填，M8 依赖其存在。
+打通 M2 → M3 → M5 → M6 → M7 → M8。M7（文章生成）默认半自动：把宫格图 + 字幕交给模型，按 `Article` 契约生成 `article.json` 回填后重跑即续接导出；加 `--mode auto` 且在 `engine/.env` 配置 `DIGGO_GEMINI_API_KEY` 时直接调 Gemini 生成。
 
 > **YouTube 鉴权**：YouTube 常要求登录验证。在 `<work-root>/cookies.txt` 放置 cookie 文件，或用 `--browser` 走 `yt-dlp --cookies-from-browser`。密钥与 cookie 只在本地，禁止提交进仓库。
 
@@ -89,15 +98,13 @@ pnpm dev
 
 ## 常用脚本
 
-
-| 命令                     | 说明                                     |
-| ---------------------- | -------------------------------------- |
+| 命令                   | 说明                                       |
+| ---------------------- | ------------------------------------------ |
 | `pnpm dev`             | 并行启动 engine + ui + desktop             |
-| `pnpm test`            | 引擎单测（vitest）                           |
-| `pnpm typecheck`       | 全 workspace 类型检查                       |
+| `pnpm test`            | 引擎单测（vitest）                         |
+| `pnpm typecheck`       | 全 workspace 类型检查                      |
 | `pnpm dist`            | 打包 macOS App（`scripts/package-mac.sh`） |
-| `pnpm refresh-cookies` | 从浏览器刷新 YouTube cookie                  |
-
+| `pnpm refresh-cookies` | 从浏览器刷新 YouTube cookie                |
 
 ---
 
@@ -110,7 +117,7 @@ pnpm dev
 3. `shared/types.ts` 是**前后端唯一契约**：先改类型，再改实现，两端同步。
 4. 去重只筛"喂 AI 的代表帧"，逐秒全集（`01_hd/`、`02_webp/`）**永不删除**。
 5. 渲染进程安全默认：`contextIsolation: true`、`nodeIntegration: false`；状态归引擎 + SQLite，不用 localStorage 持久化。
-6. 出站请求只允许 YouTube(yt-dlp)、Gemini、飞书；密钥/cookie 仅本地。
+6. 出站请求只允许 YouTube(yt-dlp)、Gemini；导出产物一律是本地文件；密钥/cookie 仅本地。
 
 > `better-sqlite3` / `sharp` 是原生模块。打包后会改写 sqlite ABI，需 `electron-rebuild` 重编（见 `scripts/restore-better-sqlite3.mjs`）。
 

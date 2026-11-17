@@ -218,7 +218,7 @@ function createWindow(origin: string): BrowserWindow {
 	});
 	win.once("ready-to-show", () => win.show());
 
-	// 外链（飞书等 target="_blank"）一律交给系统默认浏览器，不在 App 内新开 Electron 窗口。
+	// 外链（target="_blank"）一律交给系统默认浏览器，不在 App 内新开 Electron 窗口。
 	// 默认 setWindowOpenHandler 行为是新建原生窗口，这里改为 deny + shell.openExternal。
 	win.webContents.setWindowOpenHandler(({ url }) => {
 		if (/^https?:\/\//i.test(url)) void shell.openExternal(url);

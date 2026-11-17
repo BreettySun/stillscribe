@@ -6,6 +6,7 @@ import type { Task, TaskStatus } from "@shared/types";
 import { useTasksStore } from "../../stores/tasks";
 import { api } from "../../api/client";
 import { revealInFolder } from "../../bridge";
+import { listOutputs } from "../../exportFormats";
 
 const props = defineProps<{ task: Task; selected: boolean }>();
 const store = useTasksStore();
@@ -42,8 +43,10 @@ function onCancel(): void {
 function onRetry(): void {
 	void store.retry(props.task.id);
 }
+/** 任一已导出文件的路径（都在 article/ 下，用来在 Finder 里定位）。 */
+const outputPath = computed(() => listOutputs(props.task.outputs)[0]?.path);
 function onOpen(): void {
-	if (props.task.outputDocx) revealInFolder(props.task.outputDocx);
+	if (outputPath.value) revealInFolder(outputPath.value);
 }
 function onDelete(): void {
 	void store.remove(props.task.id);
@@ -102,10 +105,10 @@ const confirmOpen = ref(false);
 						重试
 					</n-button>
 					<n-button
-						v-if="task.status === 'completed' && task.outputDocx"
+						v-if="task.status === 'completed' && outputPath"
 						size="tiny"
 						@click="onOpen">
-						打开 docx
+						打开文件
 					</n-button>
 				</div>
 			</n-flex>

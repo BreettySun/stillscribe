@@ -10,7 +10,7 @@ const SKELETON = JSON.stringify(
   {
     pages: [{ subhead: "Grand Entrance", image: "00_01_23", body: "Two to four sentences." }],
     meta: { titles: ["Title A", "Title B"], keywords: ["k1", "k2"], description: "2-3 sentences." },
-    notes: { imageRationale: "中文配图思路（仅参考，不进 docx）" },
+    notes: { imageRationale: "中文配图思路（仅参考，不进导出文件）" },
   },
   null,
   2,

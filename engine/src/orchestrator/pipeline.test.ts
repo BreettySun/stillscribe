@@ -20,7 +20,7 @@ describe("overallRatio 整体进度折算", () => {
     expect(overallRatio("download", 5)).toBe(0.25);
   });
 
-  it("非流水线步骤（如 docx）返回 undefined → 走 indeterminate", () => {
-    expect(overallRatio("docx")).toBeUndefined();
+  it("非流水线步骤（如 export）返回 undefined → 走 indeterminate", () => {
+    expect(overallRatio("export")).toBeUndefined();
   });
 });

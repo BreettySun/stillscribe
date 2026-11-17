@@ -1,6 +1,6 @@
 /**
  * 任务存储：better-sqlite3 单文件库（CLAUDE.md 铁律 #9 —— 状态归引擎 + SQLite，不用浏览器存储）。
- * JSON 字段（params/article）按文本列存，读写时序列化。
+ * JSON 字段（params/article/outputs）按文本列存，读写时序列化。
  *
  * 注：better-sqlite3 是原生模块；P3b/P4 打包需 electron-rebuild 编译，含 .node 的包放 asarUnpack（CLAUDE.md §8）。
  */
@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import type {
   Article,
+  ExportOutputs,
   PipelineStep,
   Task,
   TaskParams,
@@ -22,8 +23,10 @@ interface Row {
   videoTitle: string | null;
   workDir: string;
   article: string | null;
-  outputDocx: string | null;
-  feishuUrl: string | null;
+  /** 导出产物路径（JSON：ExportOutputs）。 */
+  outputs: string | null;
+  /** 旧库遗留列：新库不建。仅在 outputs 为空时读它，映射为 outputs.docx。 */
+  outputDocx?: string | null;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,8 +44,8 @@ function rowToTask(r: Row): Task {
   if (r.currentStep) task.currentStep = r.currentStep as PipelineStep;
   if (r.videoTitle) task.videoTitle = r.videoTitle;
   if (r.article) task.article = JSON.parse(r.article) as Article;
-  if (r.outputDocx) task.outputDocx = r.outputDocx;
-  if (r.feishuUrl) task.feishuUrl = r.feishuUrl;
+  if (r.outputs) task.outputs = JSON.parse(r.outputs) as ExportOutputs;
+  else if (r.outputDocx) task.outputs = { docx: r.outputDocx };
   if (r.error) task.error = r.error;
   return task;
 }
@@ -54,8 +57,8 @@ export interface TaskPatch {
   videoTitle?: string;
   workDir?: string;
   article?: Article | null;
-  outputDocx?: string;
-  feishuUrl?: string | null;
+  /** 整体替换（不做按格式合并）。 */
+  outputs?: ExportOutputs;
   error?: string | null;
 }
 
@@ -74,17 +77,17 @@ export class TaskStore {
         videoTitle  TEXT,
         workDir     TEXT NOT NULL DEFAULT '',
         article     TEXT,
-        outputDocx  TEXT,
-        feishuUrl   TEXT,
+        outputs     TEXT,
         error       TEXT,
         createdAt   TEXT NOT NULL,
         updatedAt   TEXT NOT NULL
       );
     `);
-    // 迁移：旧库补 feishuUrl 列（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）。
+    // 迁移：旧库补 outputs 列（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）。
+    // 旧库的 outputDocx / feishuUrl 列原样留着不删：outputDocx 读时兜底映射，feishuUrl 不再使用。
     const cols = this.db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[];
-    if (!cols.some((c) => c.name === "feishuUrl")) {
-      this.db.exec(`ALTER TABLE tasks ADD COLUMN feishuUrl TEXT`);
+    if (!cols.some((c) => c.name === "outputs")) {
+      this.db.exec(`ALTER TABLE tasks ADD COLUMN outputs TEXT`);
     }
   }
 
@@ -123,9 +126,7 @@ export class TaskStore {
       workDir: patch.workDir ?? current.workDir,
       article:
         patch.article === undefined ? current.article ?? null : patch.article,
-      outputDocx: patch.outputDocx ?? current.outputDocx ?? null,
-      feishuUrl:
-        patch.feishuUrl === undefined ? current.feishuUrl ?? null : patch.feishuUrl,
+      outputs: patch.outputs ?? current.outputs ?? null,
       error: patch.error === undefined ? current.error ?? null : patch.error,
       updatedAt: new Date().toISOString(),
     };
@@ -134,8 +135,8 @@ export class TaskStore {
       .prepare(
         `UPDATE tasks SET
            status=@status, currentStep=@currentStep, videoTitle=@videoTitle,
-           workDir=@workDir, article=@article, outputDocx=@outputDocx,
-           feishuUrl=@feishuUrl, error=@error, updatedAt=@updatedAt
+           workDir=@workDir, article=@article, outputs=@outputs,
+           error=@error, updatedAt=@updatedAt
          WHERE id=@id`,
       )
       .run({
@@ -145,8 +146,7 @@ export class TaskStore {
         videoTitle: merged.videoTitle,
         workDir: merged.workDir,
         article: merged.article ? JSON.stringify(merged.article) : null,
-        outputDocx: merged.outputDocx,
-        feishuUrl: merged.feishuUrl,
+        outputs: merged.outputs ? JSON.stringify(merged.outputs) : null,
         error: merged.error,
         updatedAt: merged.updatedAt,
       });

@@ -11,9 +11,12 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import {
 	DEFAULTS,
+	EXPORT_FORMATS,
 	type BatchSubmit,
 	type CookieBrowser,
+	type ExportFormat,
 	type ExportRequest,
+	type ExportResult,
 	type Frame,
 	type GridList,
 	type PromptTemplateInfo,
@@ -29,7 +32,6 @@ import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
 import { readAISettings } from "./modules/m7/config.ts";
-import { readFeishuSettings, isFeishuConfigured } from "./modules/m9-feishu/index.ts";
 import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -105,6 +107,20 @@ function normalizeParams(x: unknown): TaskParams {
 		...normalizePromptOverride(o.promptOverride),
 		makeClips: o.makeClips === true,
 	};
+}
+
+/** 规整导出格式：省略 → 全部；必须是非空的合法格式数组（去重），否则抛 400。 */
+export function normalizeFormats(x: unknown): ExportFormat[] {
+	if (x === undefined || x === null) return [...EXPORT_FORMATS];
+	if (!Array.isArray(x) || x.length === 0) {
+		throw new HttpError(400, "formats 必须是非空数组");
+	}
+	for (const f of x) {
+		if (!EXPORT_FORMATS.includes(f as ExportFormat)) {
+			throw new HttpError(400, `不支持的导出格式: ${String(f)}`);
+		}
+	}
+	return [...new Set(x as ExportFormat[])];
 }
 
 /** 仅允许 dir 下的直接子文件，杜绝路径穿越（含 "..", 分隔符, NUL）；越界返回 null。 */
@@ -214,36 +230,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		return orchestrator.setArticle(id, article);
 	});
 
-	app.post("/tasks/:id/export", async (req) => {
+	app.post("/tasks/:id/export", async (req): Promise<ExportResult> => {
 		const id = (req.params as { id: string }).id;
 		taskOr404(id);
 		const body = (req.body ?? {}) as ExportRequest;
-		if (body.target === "feishu") {
-			if (!isFeishuConfigured()) {
-				throw new HttpError(
-					400,
-					"未配置飞书凭证（engine/.env: DIGGO_FEISHU_APP_ID / DIGGO_FEISHU_APP_SECRET / DIGGO_FEISHU_FOLDER_TOKEN）",
-				);
-			}
-			const { docxPath, feishuUrl } = await orchestrator.exportDocx(id, "feishu");
-			return { docxPath, feishuUrl };
-		}
-		const { docxPath } = await orchestrator.exportDocx(id, "local");
-		return { docxPath };
+		return orchestrator.exportArticle(id, normalizeFormats(body.formats));
 	});
 
-	// 返回上一步：completed/failed → awaiting_review（保留 article，清 feishuUrl/error）。
+	// 返回上一步：completed/failed → awaiting_review（保留 article，清 error）。
 	app.post("/tasks/:id/reopen", (req) => {
 		const id = (req.params as { id: string }).id;
 		taskOr404(id);
 		return orchestrator.reopenReview(id);
-	});
-
-	// 返回上一步（飞书失败 → docx 结果页）：failed → completed（docx 已留底，可重试导入）。
-	app.post("/tasks/:id/reopen-docx", (req) => {
-		const id = (req.params as { id: string }).id;
-		taskOr404(id);
-		return orchestrator.reopenDocxResult(id);
 	});
 
 	app.post("/tasks/:id/cancel", (req) =>
@@ -313,9 +311,6 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
 	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
 	app.get("/settings/ai", () => readAISettings());
-
-	// ---- 飞书导入状态（M9，只读）。凭证由代码侧配置（engine/.env），仅暴露"是否已配置"（铁律 #6）----
-	app.get("/settings/feishu", () => readFeishuSettings());
 
 	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----
 	app.get(
