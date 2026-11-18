@@ -26,6 +26,8 @@ const imageSource = ref<AIImageSource>("grids");
 const busy = ref<"save" | "test" | "clear" | null>(null);
 const errorText = ref("");
 const testResult = ref<AITestResult | null>(null);
+/** 用户自上次填充后是否改过表单；未改过时，引擎设置晚到会自动重填。 */
+const dirty = ref(false);
 
 const SERVICE_OPTIONS = [
 	...AI_PRESETS.map((p) => ({ label: p.label, value: p.id })),
@@ -55,18 +57,65 @@ function fillFromStore(): void {
 	apiKey.value = "";
 	errorText.value = "";
 	testResult.value = null;
+	dirty.value = false;
 }
+
+const NOT_LOADED_TEXT = "无法从引擎读取当前设置，请确认引擎已连接后重新打开此窗口";
 
 watch(
 	() => props.show,
-	(v) => {
-		if (v) fillFromStore();
+	async (v) => {
+		if (!v) return;
+		fillFromStore();
+		// 还没拿到引擎设置：再拉一次；仍失败就明说，不让用户拿兜底值去覆盖已保存的配置。
+		if (!store.settings) {
+			await store.load();
+			if (!store.settings && props.show && !dirty.value) {
+				errorText.value = NOT_LOADED_TEXT;
+			}
+		}
 	},
 	{ immediate: true },
 );
 
+// 设置晚到（或在别处被刷新）且表单没被改过：按引擎的值重填。
+watch(
+	() => store.settings,
+	(s) => {
+		if (props.show && s && !dirty.value) fillFromStore();
+	},
+);
+
+/** 表单任一项变动：标记已改，并作废旧的测试结果（结果只对应实际测过的配置）。 */
+function touch(): void {
+	dirty.value = true;
+	testResult.value = null;
+}
+function onUrlInput(v: string): void {
+	baseUrl.value = v;
+	touch();
+}
+function onModelInput(v: string): void {
+	model.value = v;
+	touch();
+}
+function onKeyInput(v: string): void {
+	apiKey.value = v;
+	touch();
+}
+function onImageSourceChange(v: AIImageSource): void {
+	imageSource.value = v;
+	touch();
+}
+function onShowUpdate(v: boolean): void {
+	// 请求进行中不允许关闭（与 mask-closable / close-on-esc 一致）。
+	if (!v && busy.value !== null) return;
+	emit("update:show", v);
+}
+
 function onPresetChange(id: string): void {
 	preset.value = id;
+	touch();
 	const p = AI_PRESETS.find((x) => x.id === id);
 	if (p) {
 		baseUrl.value = p.baseUrl;
@@ -80,7 +129,11 @@ const urlError = computed(() =>
 );
 const modelEmpty = computed(() => model.value.trim() === "");
 const canSubmit = computed(
-	() => normalized.value.ok && !modelEmpty.value && busy.value === null,
+	() =>
+		store.settings !== null &&
+		normalized.value.ok &&
+		!modelEmpty.value &&
+		busy.value === null,
 );
 
 /** Key 状态按表单里当前填的地址判断。 */
@@ -191,10 +244,11 @@ async function onSaveAndTest(): Promise<void> {
 		:show="show"
 		preset="card"
 		title="模型服务"
+		closable
 		style="width: 560px; max-width: 92vw"
 		:mask-closable="busy === null"
 		:close-on-esc="busy === null"
-		@update:show="(v: boolean) => emit('update:show', v)">
+		@update:show="onShowUpdate">
 		<n-form
 			label-placement="left"
 			label-width="84"
@@ -210,14 +264,16 @@ async function onSaveAndTest(): Promise<void> {
 				:validation-status="urlError ? 'error' : undefined"
 				:feedback="urlError || undefined">
 				<n-input
-					v-model:value="baseUrl"
+					:value="baseUrl"
+					@update:value="onUrlInput"
 					:readonly="preset !== CUSTOM"
 					placeholder="https://…/v1"
 					autocomplete="off" />
 			</n-form-item>
 			<n-form-item label="API Key">
 				<n-input
-					v-model:value="apiKey"
+					:value="apiKey"
+					@update:value="onKeyInput"
 					type="password"
 					autocomplete="off"
 					:disabled="!canStoreAIKey"
@@ -244,11 +300,14 @@ async function onSaveAndTest(): Promise<void> {
 				:validation-status="modelEmpty ? 'error' : undefined"
 				:feedback="modelEmpty ? '模型不能为空' : undefined">
 				<n-input
-					v-model:value="model"
+					:value="model"
+					@update:value="onModelInput"
 					autocomplete="off" />
 			</n-form-item>
 			<n-form-item label="喂图方式">
-				<n-radio-group v-model:value="imageSource">
+				<n-radio-group
+					:value="imageSource"
+					@update:value="onImageSourceChange">
 					<n-space>
 						<n-radio value="grids">宫格图</n-radio>
 						<n-radio value="frames">单帧（更准，费用更高）</n-radio>
