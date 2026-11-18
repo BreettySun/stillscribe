@@ -2,8 +2,12 @@
  * Electron 主进程：spawn/监督引擎子进程 + 创建窗口 + OS 集成（菜单/Finder/通知）。
  * 渲染进程通过 localhost HTTP 访问引擎，不用 IPC 直连引擎（CLAUDE.md 铁律 #8）；
  * IPC 仅用于 OS 能力（reveal/notify）。
+ *
+ * 引擎接口鉴权（engine/src/auth.ts）：主进程每次启动随机生成令牌，经 env 交给引擎，
+ * 再在网络层给"发往引擎的请求"补上 Authorization 头。渲染进程代码不接触令牌。
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
 import { mkdirSync, existsSync } from "node:fs";
 import { readFile, writeFile, rm } from "node:fs/promises";
@@ -15,6 +19,7 @@ import {
 	Menu,
 	Notification,
 	ipcMain,
+	session,
 	shell,
 } from "electron";
 import { filterYouTube } from "@engine/modules/cookies-filter";
@@ -111,6 +116,34 @@ async function refreshCookies(browser: string): Promise<{ kept: number }> {
 	}
 }
 
+/** 本次启动的引擎接口令牌：只存在于主进程内存与引擎子进程的 env，不落盘、不进渲染进程。 */
+const engineToken = randomBytes(32).toString("base64url");
+const engineAuthHeader = `Bearer ${engineToken}`;
+
+/**
+ * 渲染进程页面的来源（引擎据此放行跨源请求）。
+ * 开发态由 electron-vite 的 dev server 提供页面；打包后是 file:// 页面，其 Origin 请求头为字面量 "null"。
+ */
+function rendererOrigin(): string {
+	const devUrl = process.env["ELECTRON_RENDERER_URL"];
+	return devUrl ? new URL(devUrl).origin : "null";
+}
+
+/**
+ * 给本窗口会话里所有发往引擎的请求（fetch / <img> / EventSource）补上令牌请求头。
+ * 在网络层做：<img> 与 EventSource 无法自定义请求头，而令牌又不允许放进 URL（铁律 #6）。
+ */
+function attachEngineAuth(origin: string): void {
+	session.defaultSession.webRequest.onBeforeSendHeaders(
+		{ urls: [`${origin}/*`] },
+		(details, callback) => {
+			callback({
+				requestHeaders: { ...details.requestHeaders, Authorization: engineAuthHeader },
+			});
+		},
+	);
+}
+
 let engine: ChildProcess | null = null;
 let enginePort = 0;
 let quitting = false;
@@ -142,6 +175,9 @@ function startEngine(workRoot: string): void {
 		DIGGO_HOST: "127.0.0.1",
 		DIGGO_PORT: String(enginePort),
 		DIGGO_WORK_ROOT: workRoot,
+		// 接口鉴权：令牌 + 允许的页面来源（显式覆盖，不继承外部同名 env）。
+		DIGGO_TOKEN: engineToken,
+		DIGGO_ALLOWED_ORIGINS: rendererOrigin(),
 		// 引擎绝对路径找 CLI（铁律 #1）：env 优先，打包后指向 resources/bin，引擎保持 Electron-agnostic。
 		DIGGO_YT_DLP: path.join(bin, "yt-dlp"),
 		DIGGO_FFMPEG: path.join(bin, "ffmpeg"),
@@ -190,7 +226,9 @@ async function waitHealthy(
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		try {
-			const r = await fetch(`${origin}/tasks`);
+			const r = await fetch(`${origin}/tasks`, {
+				headers: { Authorization: engineAuthHeader },
+			});
 			if (r.ok) return true;
 		} catch {
 			/* 尚未起来 */
@@ -291,6 +329,7 @@ app.whenReady().then(async () => {
 	// P4 打包后仓库目录不存在/不可写，届时改回 app.getPath("userData")。
 	const workRoot = getWorkRoot();
 
+	attachEngineAuth(origin); // 须在创建窗口之前：页面的第一个请求就要带令牌
 	startEngine(workRoot);
 	await waitHealthy(origin);
 

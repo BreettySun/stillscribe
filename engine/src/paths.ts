@@ -15,6 +15,14 @@ export function resolveWorkRoot(env = process.env.DIGGO_WORK_ROOT): string {
   return env ? path.resolve(env) : path.resolve("work");
 }
 
+/**
+ * 单独运行引擎时自动生成的接口令牌文件（见 auth.ts）。仅当前用户可读；工作根不进 git。
+ * ui/vite.config.ts 的开发代理按同一文件名读取，改名需两处同步。
+ */
+export function engineTokenPath(workRoot: string): string {
+  return path.join(workRoot, "engine-token");
+}
+
 /** 工作根下的 cookies.txt 约定路径（refresh-cookies 落盘点 / yt-dlp --cookies 读取点）。 */
 export function cookiesPath(workRoot: string): string {
   return path.join(workRoot, "cookies.txt");

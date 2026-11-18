@@ -201,6 +201,11 @@ export interface Task {
 // HTTP API 契约（引擎暴露于 127.0.0.1）
 // ============================================================
 //
+//  鉴权（对下列全部路由生效，含静态资源与事件流；实现见 engine/src/auth.ts）：
+//    - 每个请求须带请求头 `Authorization: Bearer <token>`，否则 401。令牌只走请求头，不进 URL。
+//    - 带 Origin 的请求，其来源须在引擎的允许列表内，否则 403；Host 须为回环地址，否则 403。
+//    - 渲染进程代码不持有令牌：Electron 下由主进程在网络层附加，纯 Web 开发模式由 Vite 代理附加。
+//
 //  POST /tasks               body: TaskParams | BatchSubmit   -> SubmitResult
 //  GET  /tasks                                                -> Task[]
 //  GET  /tasks/:id                                            -> Task

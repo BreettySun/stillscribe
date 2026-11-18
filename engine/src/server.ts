@@ -1,5 +1,6 @@
 /**
- * 本地 HTTP 服务（Fastify，绑定 127.0.0.1）。按 shared/types.ts 的 HTTP 契约实现，
+ * 本地 HTTP 服务（Fastify，绑定 127.0.0.1）。所有请求须过鉴权（令牌 + 来源 + Host，见 auth.ts）。
+ * 按 shared/types.ts 的 HTTP 契约实现，
  * 进度/状态经 SSE(GET /events) 实时回传。渲染进程通过 localhost HTTP 访问（CLAUDE.md 铁律 #8）。
  *
  * 业务编排在 Orchestrator；本文件只做请求解析、校验、产物取图（含路径穿越防护）与 SSE 桥接。
@@ -28,6 +29,7 @@ import {
 	UI_DEFAULTS,
 } from "@shared/types";
 import { TaskDir, matchFiles } from "./paths.ts";
+import { isLoopbackHost, parseBearer, tokenMatches, type AuthConfig } from "./auth.ts";
 import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
@@ -45,6 +47,8 @@ export interface ServerDeps {
 	settings: SettingsStore;
 	/** 工作根目录，用于 cookie 刷新落盘 <workRoot>/cookies.txt。 */
 	workRoot: string;
+	/** 接口鉴权配置（必填：没有"不鉴权"的运行方式）。 */
+	auth: AuthConfig;
 }
 
 const THEME_MODES: readonly ThemeMode[] = ["auto", "light", "dark"];
@@ -161,10 +165,30 @@ async function listFrames(workDir: string): Promise<Frame[]> {
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
-	const { store, bus, orchestrator, settings, workRoot } = deps;
+	const { store, bus, orchestrator, settings, workRoot, auth } = deps;
 	const app = Fastify({ logger: false });
+	const allowedOrigins = new Set(auth.allowedOrigins);
 
-	app.register(cors, { origin: true }); // 本地开发：允许浏览器直连（生产走 Vite 代理同源）
+	// CORS：只对允许列表里的来源回 Access-Control-Allow-Origin（其余来源浏览器读不到响应）。
+	// 先于鉴权钩子注册——预检(OPTIONS)由它直接应答；鉴权失败的响应也带得上 CORS 头，便于排查。
+	app.register(cors, {
+		origin: (origin, cb) => cb(null, origin !== undefined && allowedOrigins.has(origin)),
+	});
+
+	// 鉴权（每个请求都过，含静态取图与 SSE）：Host → 来源 → 令牌。说明见 auth.ts。
+	app.addHook("onRequest", async (req, reply) => {
+		if (!isLoopbackHost(req.headers.host)) {
+			return reply.code(403).send({ error: "拒绝访问：Host 不是本机回环地址" });
+		}
+		const origin = req.headers.origin;
+		if (origin !== undefined && !allowedOrigins.has(origin)) {
+			return reply.code(403).send({ error: "拒绝访问：请求来源不在允许列表" });
+		}
+		if (req.method === "OPTIONS") return; // CORS 预检按规范不带凭证
+		if (!tokenMatches(auth.token, parseBearer(req.headers.authorization))) {
+			return reply.code(401).send({ error: "未授权：缺少或错误的接口令牌" });
+		}
+	});
 
 	const taskOr404 = (id: string) => {
 		const t = store.get(id);
@@ -349,7 +373,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
 	// ---- SSE 事件流 ----
 	app.get("/events", (req, reply) => {
-		// hijack 直写 socket 会绕过 @fastify/cors，需手动补 CORS 头（与 origin:true 一致，反射来源）。
+		// hijack 直写 socket 会绕过 @fastify/cors，需手动补 CORS 头。走到这里的请求已过鉴权钩子，
+		// 带 Origin 的必在允许列表内，原样回写即可。
 		// 否则桌面 App 渲染进程跨源（localhost:5173 → 127.0.0.1:port）订阅 SSE 会被浏览器拦截。
 		const origin = req.headers.origin;
 		reply.raw.writeHead(200, {

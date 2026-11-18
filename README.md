@@ -94,6 +94,14 @@ pnpm dev
 
 引擎服务环境变量：`DIGGO_WORK_ROOT`（默认 `./work`）、`DIGGO_PORT`（默认 `8787`）、`DIGGO_HOST`（默认 `127.0.0.1`）、`DIGGO_BROWSER`。
 
+**接口鉴权**：引擎的所有 HTTP 接口都要带令牌（`Authorization: Bearer <token>`），并校验请求来源与 Host，防止本机浏览器里的其他网页调用引擎。日常使用无需手动配置：
+
+- 桌面 App：主进程每次启动随机生成令牌，自动附加到发往引擎的请求上。
+- 单独跑引擎（`pnpm dev:engine`）：引擎自动生成令牌并写入 `<工作根>/engine-token`（仅当前用户可读），`pnpm dev:ui` 的开发代理会自动读取并附加。
+- 用 curl 等工具直接调接口时，自己带上请求头：`curl -H "Authorization: Bearer $(cat engine/work/engine-token)" http://127.0.0.1:8787/tasks`。
+
+相关环境变量：`DIGGO_TOKEN`（指定令牌，省略则自动生成）、`DIGGO_ALLOWED_ORIGINS`（允许跨源访问的页面来源，逗号分隔，默认为空）。
+
 ---
 
 ## 常用脚本

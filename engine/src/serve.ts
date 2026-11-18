@@ -1,7 +1,9 @@
 /**
  * 引擎服务进程入口（P2）。装配 store/bus/orchestrator + Fastify，绑定 127.0.0.1。
  * 环境变量：DIGGO_WORK_ROOT（工作根，默认 ./work）、DIGGO_PORT（默认 8787）、
- *           DIGGO_HOST（默认 127.0.0.1）、DIGGO_BROWSER（yt-dlp --cookies-from-browser）。
+ *           DIGGO_HOST（默认 127.0.0.1）、DIGGO_BROWSER（yt-dlp --cookies-from-browser）、
+ *           DIGGO_TOKEN（接口令牌；省略则自动生成并写入 <workRoot>/engine-token）、
+ *           DIGGO_ALLOWED_ORIGINS（允许的浏览器来源，逗号分隔；默认不允许任何跨源来源）。
  * cookies.txt 不在此注入——编排器按任务即时探测 <workRoot>/cookies.txt（P1 方案 A）。
  */
 import { mkdirSync } from "node:fs";
@@ -13,6 +15,7 @@ import { SettingsStore } from "./store/settings.ts";
 import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
 import { buildServer } from "./server.ts";
+import { resolveAuth } from "./auth.ts";
 
 loadDotEnv(); // 先加载 engine/.env（Gemini Key/模型等），再读各 env 默认。
 const workRoot = resolveWorkRoot();
@@ -21,6 +24,7 @@ const port = Number(process.env.DIGGO_PORT ?? 8787);
 const browser = process.env.DIGGO_BROWSER || undefined;
 
 mkdirSync(workRoot, { recursive: true });
+const auth = resolveAuth(workRoot); // 须在 workRoot 建好之后：自动生成的令牌要落到它下面
 
 const store = new TaskStore(path.join(workRoot, "tasks.db"));
 const settings = new SettingsStore(path.join(workRoot, "settings.db"));
@@ -29,7 +33,7 @@ const orchestrator = new Orchestrator(store, bus, {
   workRoot,
   ...(browser ? { browser } : {}),
 });
-const app = buildServer({ store, bus, orchestrator, settings, workRoot });
+const app = buildServer({ store, bus, orchestrator, settings, workRoot, auth });
 
 orchestrator.recover();
 

@@ -35,7 +35,7 @@
 5. **去重（M5）只筛"喂 AI 的代表帧"**，默认开启。逐秒全集（`01_hd/`、`02_webp/`）**永不删除/移动**，人工换图依赖它。
 6. **密钥与隐私只在本地**。Gemini API Key、浏览器 cookie 等：禁止硬编码、禁止提交进仓库、禁止写进 URL/query 参数、禁止发往架构未声明的第三方。出站请求只允许 YouTube(yt-dlp)、Gemini。导出产物一律是本地文件，不上传任何第三方（飞书集成已于 2026-11 移除）。
 7. **每个模块幂等、产物落盘、可单步重跑**。失败重试或从中间步骤恢复，不能要求从头再来。
-8. **UI 与引擎是独立进程**，保证崩溃隔离。引擎由 Electron 主进程 spawn（utilityProcess/fork），重处理逻辑不塞进渲染进程。**渲染进程通过 localhost HTTP 访问引擎，不用 Electron IPC 直连引擎**（以保留"先 Web 后套壳"）。
+8. **UI 与引擎是独立进程**，保证崩溃隔离。引擎由 Electron 主进程 spawn（utilityProcess/fork），重处理逻辑不塞进渲染进程。**渲染进程通过 localhost HTTP 访问引擎，不用 Electron IPC 直连引擎**（以保留"先 Web 后套壳"）。**引擎的每个 HTTP 路由都必须过鉴权**（令牌 + 来源 + Host，见 `engine/src/auth.ts`）：只监听 127.0.0.1 挡不住本机浏览器里的网页。令牌只走请求头、不进 URL，渲染进程代码不持有令牌（Electron 主进程在网络层附加；纯 Web 开发模式由 Vite 代理附加）。新增路由不得绕过鉴权钩子。
 9. **渲染进程安全默认**：`contextIsolation: true`、`nodeIntegration: false`；不在渲染进程直接用 Node/fs。**禁止用 localStorage/sessionStorage 做持久化**，状态归引擎 + SQLite。
 10. **不擅自推翻已决策方案**。为什么纯桌面、为什么 Electron+Vue / Node-TS、为什么不用 Swift/Python/Tauri，见架构文档第 2、3 节。有异议先提出，不要直接改。
 
