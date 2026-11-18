@@ -192,6 +192,32 @@ describe("chat 客户端", () => {
     expect(fake.requests).toHaveLength(1);
   });
 
+  it("外部取消信号 → kind aborted（不是 network），远早于超时", async () => {
+    const fake = await startFake(() => "hang");
+    const ac = new AbortController();
+    const started = Date.now();
+    setTimeout(() => ac.abort(), 30);
+    const err = await catchErr(
+      chatJson(
+        { baseUrl: fake.baseUrl, apiKey: "sk-test", model: "m", signal: ac.signal },
+        { parts: PARTS, schema: SCHEMA },
+      ),
+    );
+    expect(err.kind).toBe("aborted");
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(err.message).not.toContain("sk-test");
+    expect(fake.requests).toHaveLength(1);
+  });
+
+  it("信号已取消 → aborted，不发请求", async () => {
+    const fake = await startFake(() => ok("{}"));
+    const ac = new AbortController();
+    ac.abort();
+    const err = await catchErr(chatText({ baseUrl: fake.baseUrl, model: "m", signal: ac.signal }, PARTS));
+    expect(err.kind).toBe("aborted");
+    expect(fake.requests).toHaveLength(0);
+  });
+
   it("所有错误信息都不含 Key（服务端回显 Key 也要抹掉）", async () => {
     const cases: FakeReply[] = [
       { status: 401, json: { error: { message: "bad key sk-test" } } },

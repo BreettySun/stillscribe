@@ -214,8 +214,10 @@ export class Orchestrator {
   /**
    * M7 全自动：构造 client → 生成 Article → 存库（+落盘 article.json）。
    * 任何缺配置 / API 失败都【不让任务失败】，只记日志并降级——仍进 awaiting_review 让人工接手（§6）。
+   * 例外：任务被取消（signal 已中止）时，无论模型调用是抛错还是已返回，都不写 autoError、不降级、不存 article，
+   * 而是抛出，交给 runTask 的 ac.signal.aborted 分支落 canceled。
    */
-  private async tryAutoArticle(id: string, grids: GridsResult): Promise<void> {
+  private async tryAutoArticle(id: string, grids: GridsResult, signal: AbortSignal): Promise<void> {
     const cfg = this.ai.resolve();
     if (!cfg.ready) {
       process.stderr.write(`[m7] 未配置模型 API Key，降级半自动 (task ${id})\n`);
@@ -227,6 +229,7 @@ export class Orchestrator {
         baseUrl: cfg.baseUrl,
         model: cfg.model,
         ...(cfg.apiKey ? { apiKey: cfg.apiKey } : {}),
+        signal,
         ...(cfg.structuredMode ? { structuredMode: cfg.structuredMode } : {}),
         onStructuredMode: (mode) => this.ai.rememberStructuredMode(cfg.baseUrl, cfg.model, mode),
       });
@@ -246,9 +249,11 @@ export class Orchestrator {
           this.bus.emit({ type: "progress", taskId: id, progress });
         },
       );
+      if (signal.aborted) throw new Error("任务已取消");
       for (const w of warnings) process.stderr.write(`[m7][warn] ${w} (task ${id})\n`);
       this.store.update(id, { article, currentStep: null, autoError: null });
     } catch (err) {
+      if (signal.aborted) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[m7] 全自动失败，降级半自动 (task ${id}): ${msg}\n`);
       this.store.update(id, { currentStep: null, autoError: msg });
@@ -309,7 +314,7 @@ export class Orchestrator {
       // auto：直接调模型生成 article（失败则降级，仍进 awaiting_review）。
       // semi：跳过，停在 awaiting_review 等人工回填。
       if (task.params.mode === "auto") {
-        await this.tryAutoArticle(id, grids);
+        await this.tryAutoArticle(id, grids, ac.signal);
       }
       this.transition(id, "awaiting_review");
       // auto 成功后 awaiting_review 携带 article 草稿（契约：semi 此事件无 article）。

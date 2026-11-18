@@ -6,7 +6,16 @@ import type { AIStructuredMode } from "@shared/types";
 
 export type ChatPart = { type: "text"; text: string } | { type: "image"; base64: string; mimeType: string };
 
-export type AIErrorKind = "config" | "not_found" | "rate_limit" | "rejected" | "empty" | "server" | "network";
+/** aborted：调用方的 signal 取消了请求（如用户取消任务）——不是网络问题，调用方不应重试或降级。 */
+export type AIErrorKind =
+  | "config"
+  | "not_found"
+  | "rate_limit"
+  | "rejected"
+  | "empty"
+  | "server"
+  | "network"
+  | "aborted";
 
 export class AIRequestError extends Error {
   constructor(
@@ -25,6 +34,8 @@ export interface ChatOptions {
   model: string;
   /** 单次请求超时，默认 300_000 */
   timeoutMs?: number;
+  /** 调用方的取消信号；触发时中止进行中的请求并抛 kind=aborted。 */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -87,6 +98,7 @@ async function requestOnce(
   if (format) body.response_format = format;
 
   const url = `${opts.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let status: number;
   let text: string;
   try {
@@ -96,11 +108,14 @@ async function requestOnce(
       body: JSON.stringify(body),
       // 不跟随重定向：307/308 会把请求体（字幕、帧）连同 Key 重发到用户没配置过的地址，甚至降级到 http（铁律 #6）。
       redirect: "manual",
-      signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      signal: opts.signal
+        ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs),
     });
     status = res.status;
     text = await res.text();
   } catch {
+    if (opts.signal?.aborted) throw new AIRequestError("aborted", "已取消模型请求");
     // 错误原文可能带地址等细节，统一用固定文案
     throw new AIRequestError("network", "连不上模型服务（网络不通、地址写错或请求超时），请检查网络和服务地址");
   }

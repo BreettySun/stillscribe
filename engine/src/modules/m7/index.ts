@@ -15,6 +15,7 @@ import { collectImages } from "./images.ts";
 import { renderPrompt } from "./prompt.ts";
 import { findSubtitlePath, loadCleanSubtitles } from "./subtitles.ts";
 import type { ArticleClient } from "./articleClient.ts";
+import { AIRequestError } from "./chat.ts";
 
 export { createArticleClient } from "./articleClient.ts";
 export type { ArticleClient } from "./articleClient.ts";
@@ -61,6 +62,8 @@ async function generateWithRetry(
     try {
       return await client.generateArticle(input);
     } catch (err) {
+      // 被取消不是失败：不重试、不包装，原样抛给调用方（queue 据此把任务落 canceled）。
+      if (err instanceof AIRequestError && err.kind === "aborted") throw err;
       lastErr = err;
     }
   }
