@@ -180,4 +180,14 @@ describe("模型服务设置路由", () => {
 		}
 		expect(fakeA.requests).toHaveLength(0);
 	});
+
+	it("POST /settings/ai/test 从最高级重新探测，并覆盖已记住的较低级别", async () => {
+		const fake = await startFake((req) => (req.body.response_format ? ok('{"color":"red"}') : ok("ok")));
+		const a = makeApp();
+		expect((await call(a, "POST", "/settings/ai", { baseUrl: fake.baseUrl, model: "m" })).statusCode).toBe(200);
+		lastAI!.rememberStructuredMode(fake.baseUrl, "m", "json_object");
+		const res = await call(a, "POST", "/settings/ai/test");
+		expect((res.json() as AITestResult).structuredMode).toBe("json_schema");
+		expect(lastAI!.resolve().structuredMode).toBe("json_schema");
+	});
 });

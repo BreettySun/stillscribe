@@ -1,7 +1,7 @@
 /**
  * 「测试连接」：两步探测当前模型服务。
  * 1) 纯文本请求——能否连通、Key 是否有效；
- * 2) 带图的结构化请求——模型能否看图、结构化输出到哪一级。
+ * 2) 带图的结构化请求——模型能否看图、结构化输出到哪一级（总是从 json_schema 起步重新探测）。
  * 从不抛错：所有失败写进 error（AIRequestError 的文案已不含 Key）。
  */
 import type { AITestResult } from "@shared/types";
@@ -54,8 +54,9 @@ export async function testConnection(cfg: ResolvedAIConfig): Promise<AITestResul
         },
         { type: "image", base64: RED_PNG_BASE64, mimeType: "image/png" },
       ],
+      // 不从已记住的级别起步：每次都从 json_schema 重新探测，结果由调用方覆盖记住的级别，
+      // 这样一次偶发的 400 造成的降级可以靠"保存并测试"恢复。
       schema: COLOR_SCHEMA,
-      startMode: cfg.structuredMode,
     });
     return { ok: true, seesImage: seesRed(content), structuredMode: mode, latencyMs: latency() };
   } catch (e) {

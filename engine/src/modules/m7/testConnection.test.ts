@@ -83,8 +83,15 @@ describe("testConnection", () => {
     const fake = await startFake((req) =>
       JSON.stringify(req.body.messages).includes("image_url") ? ok('```json\n{"color":"red"}\n```') : ok("ok"),
     );
-    const r = await testConnection(cfgFor(fake.baseUrl, { structuredMode: "none" }));
-    expect(r).toMatchObject({ ok: true, seesImage: true, structuredMode: "none" });
+    const r = await testConnection(cfgFor(fake.baseUrl));
+    expect(r).toMatchObject({ ok: true, seesImage: true, structuredMode: "json_schema" });
+  });
+
+  it("总是从 json_schema 起步重新探测，不受已记住的级别影响", async () => {
+    const fake = await startFake((req) => (req.body.response_format ? ok('{"color":"red"}') : ok("ok")));
+    const r = await testConnection(cfgFor(fake.baseUrl, { structuredMode: "json_object" }));
+    expect(r).toMatchObject({ ok: true, seesImage: true, structuredMode: "json_schema" });
+    expect(fake.requests[1]!.body.response_format.type).toBe("json_schema");
   });
 
   it("未就绪（缺 Key）→ 不发任何请求", async () => {
