@@ -78,6 +78,88 @@ export function mergeLegacyKey(table: AIKeyTable, legacyKey: string | undefined)
 	return { ...table, [DEFAULT_AI_BASE_URL]: legacyKey };
 }
 
+// ---- Key 文件的加载 / 迁移 / 写入决策（Electron 主进程 aiKeys.ts 只负责 I/O，按这里的计划执行）----
+
+/** userData 下 Key 表文件 ai-keys.enc 的读取结果。unreadable = 存在但没能读出合法表（解密失败、内容非法、或加载时加密不可用）。 */
+export type KeyFileState = "missing" | "unreadable" | { table: AIKeyTable };
+/** 旧版 gemini-key.enc：unreadable = 存在但无法解密（含加载时加密不可用）——它可能是用户唯一的副本，永不删除。key 为空表示解出空串。 */
+export type LegacyEncState = "missing" | "unreadable" | { key: string | undefined };
+/** 旧版明文 gemini-key.txt：key 为空表示内容为空或读取失败（仍可清理）。 */
+export type LegacyTxtState = "missing" | { key: string | undefined };
+export type LegacyKeyFile = "gemini-key.enc" | "gemini-key.txt";
+
+export interface KeyLoadInput {
+	encryptionAvailable: boolean;
+	keyFile: KeyFileState;
+	legacyEnc: LegacyEncState;
+	legacyTxt: LegacyTxtState;
+}
+
+export interface KeyLoadPlan {
+	/** 本次会话使用的表（已并入旧 Key）。 */
+	table: AIKeyTable;
+	/** 是否需要把 table 写入 ai-keys.enc。 */
+	save: boolean;
+	/** 仅当这次保存成功后才可删除的旧文件。 */
+	deleteIfSaved: LegacyKeyFile[];
+	/** 无需保存即可删除的旧文件（表本就读自 ai-keys.enc 且已含其 Key）。 */
+	deleteNow: LegacyKeyFile[];
+	/** ai-keys.enc 存在但未能读取：此后写入前必须先改名保留，绝不直接覆盖。 */
+	markKeyFileUnreadable: boolean;
+}
+
+/**
+ * 加载与迁移计划。旧文件只在"返回的表已安全落在 ai-keys.enc"时清理：刚保存成功，或表读自 ai-keys.enc
+ * 且无需改动；加密不可用时什么都不写也不删。无法解密的旧 gemini-key.enc 永远保留。
+ */
+export function planKeyLoad(input: KeyLoadInput): KeyLoadPlan {
+	const { encryptionAvailable, keyFile, legacyEnc, legacyTxt } = input;
+	const loaded = typeof keyFile === "object" ? keyFile.table : {};
+	const legacyKey =
+		(typeof legacyEnc === "object" ? legacyEnc.key : undefined) ||
+		(typeof legacyTxt === "object" ? legacyTxt.key : undefined);
+	const table = mergeLegacyKey(loaded, legacyKey);
+	const changed = JSON.stringify(table) !== JSON.stringify(loaded);
+
+	const deletable: LegacyKeyFile[] = [];
+	if (typeof legacyEnc === "object") deletable.push("gemini-key.enc");
+	if (legacyTxt !== "missing") deletable.push("gemini-key.txt");
+
+	const save = changed && encryptionAvailable;
+	const loadedFromDisk = typeof keyFile === "object";
+	return {
+		table,
+		save,
+		deleteIfSaved: save ? deletable : [],
+		deleteNow: !changed && loadedFromDisk ? deletable : [],
+		// 加载时加密不可用的 ai-keys.enc 根本没读过，不标记（沿用现状）。
+		markKeyFileUnreadable: keyFile === "unreadable" && encryptionAvailable,
+	};
+}
+
+/** 解密后的 ai-keys.enc 文本 → 表；解出来不是合法表（且不是字面量 {}）视为 unreadable，别拿空表覆盖它。 */
+export function decodeKeyFile(text: string): Exclude<KeyFileState, "missing"> {
+	const table = parseKeyTable(text);
+	if (Object.keys(table).length === 0 && text.trim() !== "{}") return "unreadable";
+	return { table };
+}
+
+export interface KeySavePlan {
+	write: boolean;
+	/** 写入前先把现有 ai-keys.enc 改名保留；改名失败则放弃写入。 */
+	renameAsideFirst: boolean;
+}
+
+/** 写入计划：加密不可用不写；被标记为不可读且仍存在的 ai-keys.enc 先改名保留。 */
+export function planKeySave(input: {
+	encryptionAvailable: boolean;
+	keyFileExists: boolean;
+	keyFileUnreadable: boolean;
+}): KeySavePlan {
+	if (!input.encryptionAvailable) return { write: false, renameAsideFirst: false };
+	return { write: true, renameAsideFirst: input.keyFileUnreadable && input.keyFileExists };
+}
+
 export interface AIPreset {
 	id: string;
 	label: string;
