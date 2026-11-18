@@ -13,6 +13,9 @@ import cors from "@fastify/cors";
 import {
 	DEFAULTS,
 	EXPORT_FORMATS,
+	type AIKeyUpdate,
+	type AISettings,
+	type AISettingsPatch,
 	type BatchSubmit,
 	type CookieBrowser,
 	type ExportFormat,
@@ -33,7 +36,7 @@ import { isLoopbackHost, parseBearer, tokenMatches, type AuthConfig } from "./au
 import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
-import type { AIConfig } from "./modules/m7/aiConfig.ts";
+import { AIConfigError, type AIConfig } from "./modules/m7/aiConfig.ts";
 import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -54,6 +57,15 @@ export interface ServerDeps {
 }
 
 const THEME_MODES: readonly ThemeMode[] = ["auto", "light", "dark"];
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+	return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** AIConfigError 的消息只含地址/字段说明，不含 Key，可直接回给调用方；其他异常原样抛出 */
+function asHttpError(e: unknown): unknown {
+	return e instanceof AIConfigError ? new HttpError(400, e.message) : e;
+}
 
 class HttpError extends Error {
 	constructor(
@@ -200,7 +212,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
 	app.setErrorHandler((err: unknown, _req, reply) => {
 		const status = err instanceof HttpError ? err.statusCode : 400;
-		const message = err instanceof Error ? err.message : String(err);
+		let message = err instanceof Error ? err.message : String(err);
+		// 请求体解析失败（非法 JSON 等）的原文可能带出请求体片段（含 Key），一律换成固定文案
+		const code = (err as { code?: unknown }).code;
+		if (typeof code === "string" && code.startsWith("FST_ERR_CTP")) message = "请求体无效";
 		reply.code(status).send({ error: message });
 	});
 
@@ -334,9 +349,41 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		return readUISettings();
 	});
 
-	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
-	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
+	// ---- 模型服务设置（M7）。三条路由：GET 读取、POST 保存地址/模型/喂图策略、
+	//       PUT /settings/ai/key 写入或清除某地址的 Key（只写：任何响应都不含 Key，铁律 #6）。
+	//       body 形状先在此校验，值的合法性（地址规范化等）由 AIConfig 判定，错误一律 400 ----
 	app.get("/settings/ai", () => ai.read());
+
+	app.post("/settings/ai", (req): AISettings => {
+		const body = req.body;
+		if (!isPlainObject(body)) throw new HttpError(400, "请求体必须是 JSON 对象");
+		const patch: Record<string, string> = {};
+		for (const k of ["baseUrl", "model", "imageSource"]) {
+			if (body[k] === undefined) continue;
+			if (typeof body[k] !== "string") throw new HttpError(400, `${k} 必须是字符串`);
+			patch[k] = body[k];
+		}
+		try {
+			return ai.save(patch as AISettingsPatch);
+		} catch (e) {
+			throw asHttpError(e);
+		}
+	});
+
+	app.put("/settings/ai/key", (req): AISettings => {
+		const body = req.body;
+		if (!isPlainObject(body)) throw new HttpError(400, "请求体必须是 JSON 对象");
+		if (typeof body.baseUrl !== "string") throw new HttpError(400, "baseUrl 必须是字符串");
+		if (body.apiKey !== null && typeof body.apiKey !== "string") {
+			throw new HttpError(400, "apiKey 必须是字符串或 null");
+		}
+		const update: AIKeyUpdate = { baseUrl: body.baseUrl, apiKey: body.apiKey };
+		try {
+			return ai.setKey(update);
+		} catch (e) {
+			throw asHttpError(e);
+		}
+	});
 
 	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----
 	app.get(

@@ -252,8 +252,11 @@ export interface Task {
 //  POST /tasks/:id/reopen                                     -> Task   (completed/failed → awaiting_review，返回校对；清 error)
 //  POST /tasks/:id/cancel                                     -> Task
 //
-//  --- AI 全自动状态（M7，只读；model/Key 由代码侧配置 engine/.env，不经 HTTP 修改，绝不回传明文）---
+//  --- 模型服务设置（M7；任何响应都绝不含 Key 明文）---
 //  GET  /settings/ai                                          -> AISettings        (baseUrl/model/imageSource + hasApiKey/keySource/ready/keyedBaseUrls)
+//  POST /settings/ai         body: AISettingsPatch            -> AISettings        (保存地址/模型/喂图策略；地址会规范化；非法值 -> 400)
+//  PUT  /settings/ai/key     body: AIKeyUpdate                -> AISettings        (只写：写入/清除某地址的 Key，apiKey=null 为清除；
+//                                                                                   Key 不会被任何路由返回；非法地址或 body 形状 -> 400)
 //
 //  --- 静态资源（给浏览器看图；引擎按任务 workDir 内取，含路径穿越防护）---
 //  GET  /static/:id/grids/:file   -> image/jpeg   宫格图字节（03_grids/<file>）
