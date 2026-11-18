@@ -142,6 +142,10 @@ async function requestOnce(
   if (status === 429) {
     throw new AIRequestError("rate_limit", "请求太频繁或额度用完，被服务限流了（HTTP 429），请稍后再试", status);
   }
+  if (status >= 400 && status < 500) {
+    // 402（额度用完）、413（请求太大）等：服务端原文往往就是答案，照 rejected 的做法附上（已抹掉 Key）；仍按 server 处理，不降级。
+    throw new AIRequestError("server", `模型服务拒绝了请求（HTTP ${status}）：${serverMsg}`, status);
+  }
   throw new AIRequestError("server", `模型服务出错了（HTTP ${status}），请稍后再试`, status);
 }
 

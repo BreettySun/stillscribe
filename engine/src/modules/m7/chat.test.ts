@@ -104,6 +104,8 @@ describe("chat 客户端", () => {
     [403, "config"],
     [404, "not_found"],
     [429, "rate_limit"],
+    [402, "server"],
+    [413, "server"],
     [500, "server"],
   ])("HTTP %i → kind %s，且不降级", async (status, kind) => {
     const fake = await startFake(() => ({ status, json: { error: { message: "boom" } } }));
@@ -112,6 +114,18 @@ describe("chat 客户端", () => {
     expect(err.status).toBe(status);
     expect(fake.requests).toHaveLength(1);
     expect(err.message).not.toContain("sk-test");
+  });
+
+  it.each([402, 413, 418])("未单列的 4xx（HTTP %i）：kind server，信息带服务端原文（Key 已抹掉）", async (status) => {
+    const fake = await startFake(() => ({ status, json: { error: { message: "insufficient credit for sk-test" } } }));
+    const err = await catchErr(
+      chatJson({ baseUrl: fake.baseUrl, apiKey: "sk-test", model: "m" }, { parts: PARTS, schema: SCHEMA }),
+    );
+    expect(err.kind).toBe("server");
+    expect(err.message).toContain(`HTTP ${status}`);
+    expect(err.message).toContain("insufficient credit for");
+    expect(err.message).not.toContain("sk-test");
+    expect(fake.requests).toHaveLength(1);
   });
 
   it("Gemini 兼容层的无效 Key：400 + 数组外形 → config，不降级", async () => {
