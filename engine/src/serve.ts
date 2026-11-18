@@ -18,7 +18,7 @@ import { buildServer } from "./server.ts";
 import { resolveAuth } from "./auth.ts";
 import { AIConfig } from "./modules/m7/aiConfig.ts";
 
-loadDotEnv(); // 先加载 engine/.env（Gemini Key/模型等），再读各 env 默认。
+loadDotEnv(); // 先加载 engine/.env（模型服务 Key/模型等），再读各 env 默认。
 const workRoot = resolveWorkRoot();
 const host = process.env.STILLSCRIBE_HOST ?? "127.0.0.1";
 const port = Number(process.env.STILLSCRIBE_PORT ?? 8787);

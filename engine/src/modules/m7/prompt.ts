@@ -1,11 +1,11 @@
 /**
  * M7 提示词渲染。与半自动【同一套模板】（AI 集成文档 §1）。
  *
- * 【占位】真正的 Gemini Prompt 是已调好的资产（CLAUDE.md §8：不要重写已调好的 Prompt，
+ * 【占位】真正的提示词是已调好的资产（CLAUDE.md §8：不要重写已调好的 Prompt，
  * 只在其基础上改造成 JSON 输出）。此处先放占位模板，待录入既有 Prompt：
  *   把它落到本目录的 `prompt.template.txt`，本模块会自动优先读取该文件。
  *
- * 注意：字幕作为独立 content part 发给模型（见 geminiClient），不在提示词里内联，
+ * 注意：字幕作为独立 content part 发给模型（见 chat.ts），不在提示词里内联，
  * 故模板变量不含 subtitles，只含视频元信息与帧数提示。
  */
 import { existsSync } from "node:fs";
@@ -32,7 +32,7 @@ export interface PromptVars {
 }
 
 /** 占位模板：表达结构与边界，待替换为既有半自动 Prompt 的 JSON 输出版。 */
-const PLACEHOLDER_TEMPLATE = `【占位提示词 — 待录入既有半自动同款 Gemini Prompt（见 CLAUDE.md §8 / AI 集成文档 §1）】
+const PLACEHOLDER_TEMPLATE = `【占位提示词 — 待录入既有半自动同款提示词（见 CLAUDE.md §8 / AI 集成文档 §1）】
 
 你将看到一段视频字幕（随后作为独立内容传入）与 {{imageCount}} 张取自视频《{{videoTitle}}》的画面。
 请据此生成一篇结构化图文文章，并严格按系统约定的 JSON Schema 输出（不要输出 Schema 之外的任何文本）。

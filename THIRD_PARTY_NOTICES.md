@@ -36,13 +36,12 @@
 | [docx](https://github.com/dolanmiu/docx) | 生成 Word 文档 | MIT |
 | [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | 任务与设置存储 | MIT |
 | [sharp](https://github.com/lovell/sharp) | 去重时计算感知哈希（其依赖的 libvips 为 LGPL） | Apache-2.0 |
-| [@google/genai](https://github.com/googleapis/js-genai) | 调用 Gemini | Apache-2.0 |
 
 ## 三、外部服务
 
 本工具会访问以下第三方服务，使用时须遵守它们各自的服务条款：
 
 - **YouTube**：通过 yt-dlp 下载视频与字幕。
-- **Google Gemini API**：自动生成文章时调用，需要你自己的 API Key，并按 Google 的条款与定价计费。
+- **模型服务**：由用户自行配置，按该服务的条款与定价计费（默认 Google Gemini API）。
 
 本项目与 YouTube、Google 没有任何关联，也未获得其认可或背书。

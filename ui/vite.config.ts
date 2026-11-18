@@ -12,7 +12,7 @@ const ENGINE_DIR = fileURLToPath(new URL("../engine", import.meta.url));
 
 /**
  * 读取与引擎相同的开发配置：进程环境变量优先，其次 engine/.env（引擎自己也读它，见 engine/src/env.ts）。
- * 只挑代理需要的几个键，不把 engine/.env 里的其他内容（如 Gemini Key）载入本进程。
+ * 只挑代理需要的几个键，不把 engine/.env 里的其他内容（如模型服务 Key）载入本进程。
  */
 const KEYS = ["STILLSCRIBE_ENGINE_URL", "STILLSCRIBE_PORT", "STILLSCRIBE_WORK_ROOT", "STILLSCRIBE_TOKEN"] as const;
 function readEngineDotEnv(): Record<string, string | undefined> {

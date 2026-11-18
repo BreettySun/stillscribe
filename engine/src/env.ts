@@ -1,7 +1,7 @@
 /**
  * 本地 .env 加载（引擎私有配置，不进 git —— 根 .gitignore 已忽略 .env）。
  *
- * 用途：把 Gemini API Key / 模型等「由代码侧配置、对最终用户透明」的值，从 engine/.env 读入 process.env。
+ * 用途：把模型服务 API Key / 接口地址 / 模型等「由代码侧配置、对最终用户透明」的值，从 engine/.env 读入 process.env。
  * 【铁律 #6】Key 只在本地，绝不硬编码进提交源码、绝不入库。值放 engine/.env（已忽略），
  *           模板见 engine/.env.example。
  *

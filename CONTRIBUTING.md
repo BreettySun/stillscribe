@@ -14,7 +14,7 @@
 ```bash
 pnpm install
 pnpm --filter @stillscribe/engine setup-tools   # 下载 ffmpeg / ffprobe / yt-dlp / deno 到 bin/
-cp engine/.env.example engine/.env        # 可选：填入 Gemini API Key 以启用自动生成文章
+cp engine/.env.example engine/.env        # 可选：填入模型服务的 API Key 以启用自动生成文章（见文件内说明）
 pnpm dev                                  # 引擎 + 界面 + 桌面壳一起启动
 ```
 
@@ -32,7 +32,7 @@ pnpm test        # 引擎单元测试
 - **新功能和缺陷修复都要带测试。** 引擎模块按"给定输入，应产出什么"来写断言，测试文件与源文件同目录，命名为 `*.test.ts`。
 - **改数据结构先改契约。** `shared/types.ts` 是界面与引擎之间唯一的类型来源：先改它，再改两端实现，并在 PR 说明里点出契约变更。
 - **新增 HTTP 路由不得绕过鉴权。** 引擎的每个路由都要过令牌、来源、Host 三道检查，见 [engine/src/auth.ts](engine/src/auth.ts)。
-- **不要引入新的出站请求。** 目前只允许访问 YouTube 和 Gemini。确有需要请先开 issue。
+- **不要引入新的出站请求。** 目前只允许访问 YouTube 和用户在设置里配置的模型服务地址。确有需要请先开 issue。
 - **不要提交密钥和产物。** `engine/.env`、`cookies.txt`、`bin/`、工作目录都已在 `.gitignore` 里，提交前用 `git status` 再确认一遍。
 
 `pnpm dist` 打包时会把 `better-sqlite3` 重编成 Electron 的版本，脚本结束时会自动恢复。如果打包中途被强行中断，之后测试报原生模块版本不匹配，运行 `node scripts/restore-better-sqlite3.mjs` 即可。

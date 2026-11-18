@@ -7,7 +7,7 @@
 
 ## 1. 项目概述
 
-把"YouTube 视频 → 图文文章"的手工流程封装成**纯桌面 macOS 应用**。一条 URL 进去，自动完成下载、逐秒抽帧加水印、去重选帧、拼宫格图，再由 Gemini 生成结构化文章，最后程序化导出带配图的本地文件（docx / Markdown / HTML）。
+把"YouTube 视频 → 图文文章"的手工流程封装成**纯桌面 macOS 应用**。一条 URL 进去，自动完成下载、逐秒抽帧加水印、去重选帧、拼宫格图，再由用户所选的模型生成结构化文章，最后程序化导出带配图的本地文件（docx / Markdown / HTML）。
 
 形态：**Electron + Vue（UI）+ Node/TS 引擎（本地进程）**，两者通过本地 HTTP/WS 通信。重活全在引擎；UI 是薄客户端。详见架构文档。
 
@@ -33,7 +33,7 @@
 3. **共享类型即契约**。`shared/types.ts` 是前后端唯一事实来源。要改数据结构，**先改类型、再改实现**，并保证渲染进程与引擎端同步。不得在某一端私自定义"影子结构"。
 4. **M7 的中文说明 / CoT 只能进 `ArticleNotes`**，绝不进 `body`、绝不进任何导出文件（docx / Markdown / HTML）。正文字段保持纯净、可直接发布。
 5. **去重（M5）只筛"喂 AI 的代表帧"**，默认开启。逐秒全集（`01_hd/`、`02_webp/`）**永不删除/移动**，人工换图依赖它。
-6. **密钥与隐私只在本地**。Gemini API Key、浏览器 cookie 等：禁止硬编码、禁止提交进仓库、禁止写进 URL/query 参数、禁止发往架构未声明的第三方。出站请求只允许 YouTube(yt-dlp)、Gemini。导出产物一律是本地文件，不上传任何第三方（飞书集成已于 2026-11 移除）。
+6. **密钥与隐私只在本地**。模型服务 API Key、浏览器 cookie 等：禁止硬编码、禁止提交进仓库、禁止写进 URL/query 参数、禁止发往架构未声明的第三方。出站请求只允许 YouTube(yt-dlp) 与**用户在设置中配置的模型服务地址**（默认 Google Gemini）。API Key 与其接口地址绑定，绝不发往其他地址。导出产物一律是本地文件，不上传任何第三方（飞书集成已于 2026-11 移除）。
 7. **每个模块幂等、产物落盘、可单步重跑**。失败重试或从中间步骤恢复，不能要求从头再来。
 8. **UI 与引擎是独立进程**，保证崩溃隔离。引擎由 Electron 主进程 spawn（utilityProcess/fork），重处理逻辑不塞进渲染进程。**渲染进程通过 localhost HTTP 访问引擎，不用 Electron IPC 直连引擎**（以保留"先 Web 后套壳"）。**引擎的每个 HTTP 路由都必须过鉴权**（令牌 + 来源 + Host，见 `engine/src/auth.ts`）：只监听 127.0.0.1 挡不住本机浏览器里的网页。令牌只走请求头、不进 URL，渲染进程代码不持有令牌（Electron 主进程在网络层附加；纯 Web 开发模式由 Vite 代理附加）。新增路由不得绕过鉴权钩子。
 9. **渲染进程安全默认**：`contextIsolation: true`、`nodeIntegration: false`；不在渲染进程直接用 Node/fs。**禁止用 localStorage/sessionStorage 做持久化**，状态归引擎 + SQLite。
@@ -75,7 +75,7 @@
 ├── source/      # 原始 mp4 + 字幕
 ├── 01_hd/       # 1280x720 逐秒 HD（换图浏览 + M8 配图源）
 ├── 02_webp/     # 640x360 + 水印 逐秒 webp（M5/M6 用）
-├── 03_grids/    # 去重后代表帧拼的宫格图（喂 Gemini）
+├── 03_grids/    # 去重后代表帧拼的宫格图（喂模型）
 ├── article/     # article.json (M7) + M8 导出：article_final.docx、article.md、article.html、
 │                #   article.standalone.html（图片内嵌单文件）、images/（md/html 共用配图）
 ├── mp4_clips/   # 视频切片（可选）
@@ -101,7 +101,7 @@
 | M3 帧生成 | 一趟 ffmpeg | 同时产 640×360+水印 webp 全集 与 1280 HD 全集；无二次编码 |
 | M5 去重 | sharp/phash 选代表帧 | 默认开；只产代表帧清单；全集不动 |
 | M6 宫格图 | ffmpeg `tile` 滤镜拼图（原 ImageMagick montage，为自包含已弃用） | 输入是代表帧，10×5/组，cell 320×180 |
-| M7 文章 | Gemini → 结构化 JSON | 输出对齐 `Article` 类型；中文说明进 notes |
+| M7 文章 | 模型（OpenAI 兼容接口）→ 结构化 JSON | 输出对齐 `Article` 类型；中文说明进 notes |
 | M8 导出 | 程序化生成本地文件：docx(dolanmiu) / Markdown / HTML | 配图取 1280 HD；md/html 的配图从 `01_hd` **原样拷贝**到 `article/images/`（不再编码，铁律 #2）；一次生成，不走"先生成再调图" |
 | M9 发布 | 已取消（2026-11） | 产出以本地文件为主，不再对接飞书；发布到 CMS 由用户拿导出文件自行完成 |
 | M10 切片 | ffmpeg 切片 | 可选、低优先 |
@@ -122,5 +122,5 @@
 - 本项目用 **Electron**，不要混入 Tauri/Rust 写法；渲染进程保持 `contextIsolation: true` / `nodeIntegration: false`。
 - 引入 `sharp`/`better-sqlite3` 等**原生模块**时，记得它们带原生二进制，Electron 下需 **electron-rebuild** 编译、含 `.node` 的包放 `asarUnpack`（见开发计划 S4）；不确定就在 PR 里标出。
 - 不要凭空编造 yt-dlp/ffmpeg 的参数——**以项目里既有的、已验证过的命令为准**（待用户提供脚本/命令清单后录入 `docs/`）。
-- 不要重写已调好的 Gemini Prompt，只在其基础上改造成 JSON 输出。
+- 不要重写已调好的提示词，只在其基础上改造成 JSON 输出。
 - 涉及第三方网页/字幕/视频内容时，遵守版权：不整段复制受版权文本。

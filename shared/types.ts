@@ -29,14 +29,11 @@ export type ISODateTime = string;
 /** 下载画质（使用 "<=" 语义，无对应分辨率时自动降级）。 */
 export type VideoQuality = 1080 | 1440;
 
-/** 文章生成模式。auto=调 Gemini API；semi=网页版人工粘贴回填。 */
+/** 文章生成模式。auto=调模型服务；semi=网页版人工粘贴回填。 */
 export type ArticleMode = "auto" | "semi";
 
 /** 模型 ID（可配置，速度/质量/价格权衡）。各模型服务的 ID 不同，故保留为字符串。 */
 export type AIModel = string;
-
-/** @deprecated 改用 AIModel；Task 11 删除。 */
-export type GeminiModel = AIModel;
 
 /** 结构化输出方式：json_schema（严格）> json_object（仅保证 JSON）> none（靠提示词约束）。 */
 export type AIStructuredMode = "json_schema" | "json_object" | "none";
@@ -162,7 +159,7 @@ export interface Frame {
 	hdPath: string;
 	/** 02_webp/ 下的 640x360 + 水印 webp 路径（M5/M6 用）。 */
 	webpPath: string;
-	/** 是否被 M5 选为代表帧（仅代表帧进入 M6 / 喂 Gemini）。 */
+	/** 是否被 M5 选为代表帧（仅代表帧进入 M6 / 喂模型）。 */
 	isRepresentative: boolean;
 }
 
@@ -267,7 +264,7 @@ export interface Task {
 //  --- 事件流 ---
 //  GET  /events                   -> text/event-stream   SSE 全局事件流，逐条推送 EngineEvent
 //
-//  半自动(semi)说明：EngineEvent.awaiting_review 携带的 article 是 auto 模式的 Gemini 草稿；
+//  半自动(semi)说明：EngineEvent.awaiting_review 携带的 article 是 auto 模式的模型草稿；
 //  semi 模式在 M6(grids) 完成后【没有 article】，引擎改发 status_changed → "awaiting_review"。
 //  UI 据 GET /tasks/:id 发现 article 为空且 params.mode==="semi" 时，展示宫格图 + 文章 JSON 回填框。
 //
