@@ -1,5 +1,5 @@
 /**
- * M7 全自动编排：素材(代表帧/宫格图 + 字幕) + 提示词 → geminiClient → Article（AI 集成文档 §1~§3）。
+ * M7 全自动编排：素材(代表帧/宫格图 + 字幕) + 提示词 → articleClient → Article（AI 集成文档 §1~§3）。
  *
  * 与半自动产出同一个 Article，下游全部复用：校验、写 article/article.json、awaiting_review、
  * 人工校对、M8 docx —— 都不动。本模块只替掉"等人工粘贴"那一停。
@@ -14,10 +14,10 @@ import { TaskDir, matchFiles } from "../../paths.ts";
 import { collectImages } from "./images.ts";
 import { renderPrompt } from "./prompt.ts";
 import { findSubtitlePath, loadCleanSubtitles } from "./subtitles.ts";
-import type { GeminiClient } from "./geminiClient.ts";
+import type { ArticleClient } from "./articleClient.ts";
 
-export { createGeminiClient } from "./geminiClient.ts";
-export type { GeminiClient } from "./geminiClient.ts";
+export { createArticleClient } from "./articleClient.ts";
+export type { ArticleClient } from "./articleClient.ts";
 
 export interface GenerateOptions {
   /** 本任务工作目录。 */
@@ -29,9 +29,11 @@ export interface GenerateOptions {
   /** 本次提交的自定义提示词模板全文；省略=用引擎默认模板。 */
   promptOverride?: string;
   /** 已注入的客户端（依赖倒置，便于测试 / 换供应商）。 */
-  client: GeminiClient;
+  client: ArticleClient;
   /** 结构化输出失败重试次数（§6：重试几次仍失败再降级）。默认 2。 */
   retries?: number;
+  /** 模型名，仅用于进度与错误文案。 */
+  modelLabel?: string;
   /** 进度回调（喂模型时给个文案）。 */
   onProgress?(message: string): void;
 }
@@ -48,9 +50,9 @@ async function frameTimestamps(td: TaskDir): Promise<Set<string>> {
   return new Set(hd.map((f) => f.slice(0, -".jpg".length)));
 }
 
-/** 调一次 Gemini（含重试）拿 Article。 */
+/** 调一次模型（含重试）拿 Article。 */
 async function generateWithRetry(
-  client: GeminiClient,
+  client: ArticleClient,
   input: { images: Awaited<ReturnType<typeof collectImages>>; subtitles: string; prompt: string },
   retries: number,
 ): Promise<Article> {
@@ -63,7 +65,7 @@ async function generateWithRetry(
     }
   }
   throw new Error(
-    `Gemini 生成失败（重试 ${retries} 次）: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    `模型生成失败（重试 ${retries} 次）: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
   );
 }
 
@@ -88,7 +90,9 @@ export async function generateArticle(opts: GenerateOptions): Promise<GenerateRe
     opts.promptOverride,
   );
 
-  opts.onProgress?.(`调用 Gemini 生成文章（${images.length} 图，${imageSource}）…`);
+  opts.onProgress?.(
+    `调用模型${opts.modelLabel ? ` ${opts.modelLabel} ` : ""}生成文章（${images.length} 图，${imageSource}）…`,
+  );
   const article = await generateWithRetry(client, { images, subtitles, prompt }, opts.retries ?? 2);
 
   // 语义校验（§2）：image 时间戳须在帧集合内，否则标记待人工换图（不阻断，进 awaiting_review 处理）。

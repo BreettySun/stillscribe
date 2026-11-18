@@ -1,6 +1,6 @@
 /**
- * M7 端到端（软件路径）：用 stub GeminiClient 跑通 备料 → client → 解析校验 → 落盘 article.json。
- * 不触网、不依赖真 SDK——验证除"Gemini HTTP"外的全部编排正确。真 SDK 调用见 scripts/gemini-smoke.ts。
+ * M7 端到端（软件路径）：用 stub ArticleClient 跑通 备料 → client → 解析校验 → 落盘 article.json。
+ * 不触网、不依赖真实模型服务——验证除"模型 HTTP"外的全部编排正确。真实调用见 scripts/ai-smoke.ts。
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -10,7 +10,7 @@ import type { Article } from "@shared/types";
 import { TaskDir } from "../../paths.ts";
 import { writeManifest } from "../m5-select.ts";
 import { generateArticle } from "./index.ts";
-import type { GeminiClient, GenerateArticleInput } from "./geminiClient.ts";
+import type { ArticleClient, GenerateArticleInput } from "./articleClient.ts";
 
 let root: string;
 let td: TaskDir;
@@ -35,7 +35,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 /** 记录收到的输入、回吐固定 Article 的 stub。 */
-function stubClient(article: Article, captured: { input?: GenerateArticleInput }): GeminiClient {
+function stubClient(article: Article, captured: { input?: GenerateArticleInput }): ArticleClient {
   return {
     async generateArticle(input) {
       captured.input = input;

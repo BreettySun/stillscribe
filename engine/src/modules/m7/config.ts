@@ -7,10 +7,12 @@
  *   - API Key：仅来自 env STILLSCRIBE_GEMINI_API_KEY（由 engine/.env 加载，见 env.ts）。
  * 【铁律 #6】Key 只在本地、绝不硬编码进提交源码、绝不入库；这里只读 env，不接受渲染进程明文。
  */
+import { DEFAULT_AI_BASE_URL } from "@shared/ai";
 import { AI_DEFAULTS, type AISettings, type AIImageSource, type GeminiModel } from "@shared/types";
 
 export interface ResolvedAIConfig {
   apiKey: string | undefined;
+  baseUrl: string;
   model: GeminiModel;
   imageSource: AIImageSource;
 }
@@ -18,11 +20,12 @@ export interface ResolvedAIConfig {
 /** 解析全自动配置（纯读 env + 代码默认；调用前应已 loadDotEnv）。 */
 export function resolveAIConfig(): ResolvedAIConfig {
   const apiKey = process.env.STILLSCRIBE_GEMINI_API_KEY || undefined;
+  const baseUrl = process.env.STILLSCRIBE_AI_BASE_URL || DEFAULT_AI_BASE_URL;
   const model = process.env.STILLSCRIBE_GEMINI_MODEL || AI_DEFAULTS.model;
   const envSource = process.env.STILLSCRIBE_AI_IMAGE_SOURCE;
   const imageSource: AIImageSource =
     envSource === "grids" || envSource === "frames" ? envSource : AI_DEFAULTS.imageSource;
-  return { apiKey, model, imageSource };
+  return { apiKey, baseUrl, model, imageSource };
 }
 
 /** 对渲染进程暴露的只读视图：只说"是否已配置"，绝不回读明文 Key。 */

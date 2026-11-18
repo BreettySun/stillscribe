@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { cleanSrt } from "./subtitles.ts";
 import { parseAndValidateArticle } from "./parse.ts";
-import { articleResponseSchema } from "./schema.ts";
+import { articleJsonSchema } from "./schema.ts";
 import { renderPrompt, loadPromptTemplate } from "./prompt.ts";
 
 describe("cleanSrt 字幕清洗", () => {
@@ -75,9 +75,14 @@ describe("renderPrompt 提示词渲染", () => {
   });
 });
 
-describe("articleResponseSchema 镜像 Article 契约", () => {
+describe("articleJsonSchema 镜像 Article 契约", () => {
   it("顶层 required 含 pages/meta，且 body 在 page required 内", () => {
-    expect(articleResponseSchema.required).toEqual(["pages", "meta"]);
-    expect(articleResponseSchema.properties.pages.items.required).toContain("body");
+    expect(articleJsonSchema.required).toEqual(["pages", "meta"]);
+    expect(articleJsonSchema.properties.pages.items.required).toContain("body");
+  });
+
+  it("全部 type 为小写的标准 JSON Schema", () => {
+    expect(JSON.stringify(articleJsonSchema)).not.toMatch(/"type":"[A-Z]/);
+    expect((articleJsonSchema as any).type).toBe("object");
   });
 });

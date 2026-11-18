@@ -26,7 +26,7 @@ import { generateFrames } from "../modules/m3-frames.ts";
 import { selectRepresentatives, writeManifest } from "../modules/m5-select.ts";
 import { buildGrids } from "../modules/m6-grids.ts";
 import { generateArticle, type GenerateResult } from "../modules/m7/index.ts";
-import type { GeminiClient } from "../modules/m7/geminiClient.ts";
+import type { ArticleClient } from "../modules/m7/articleClient.ts";
 import type { AIImageSource } from "@shared/types";
 import { buildDocx } from "../modules/m8-docx.ts";
 import { buildExportDoc, copyExportImages, type ExportImage } from "../modules/m8-layout.ts";
@@ -126,18 +126,20 @@ export async function runToGrids(params: TaskParams, hooks: PipelineHooks): Prom
 }
 
 export interface ArticleDeps {
-  /** 注入的 Gemini 客户端（queue 据配置构造）。 */
-  client: GeminiClient;
+  /** 注入的文章客户端（queue 据配置构造）。 */
+  client: ArticleClient;
   videoTitle: string;
   imageSource: AIImageSource;
   /** 本次提交的自定义提示词模板全文；省略=用引擎默认模板。 */
   promptOverride?: string;
+  /** 模型名，仅用于进度与错误文案。 */
+  modelLabel?: string;
   /** 结构化输出失败重试次数。 */
   retries?: number;
 }
 
 /**
- * M7（auto 模式）：素材 → Gemini → Article，落盘 article.json，停在"喂 AI 之后"。
+ * M7（auto 模式）：素材 → 模型 → Article，落盘 article.json，停在"喂 AI 之后"。
  * 失败抛错由调用方降级到半自动 UI（AI 集成文档 §6）。semi 模式不走这里。
  */
 export async function runArticle(
@@ -145,13 +147,14 @@ export async function runArticle(
   deps: ArticleDeps,
   onStep?: (progress: StepProgress) => void | Promise<void>,
 ): Promise<GenerateResult> {
-  await onStep?.({ step: "article", message: "调用 Gemini 生成文章…" });
+  await onStep?.({ step: "article", message: "调用模型生成文章…" });
   return generateArticle({
     taskDir,
     videoTitle: deps.videoTitle,
     imageSource: deps.imageSource,
     client: deps.client,
     ...(deps.promptOverride != null ? { promptOverride: deps.promptOverride } : {}),
+    ...(deps.modelLabel != null ? { modelLabel: deps.modelLabel } : {}),
     ...(deps.retries != null ? { retries: deps.retries } : {}),
     onProgress: (message) => void onStep?.({ step: "article", message }),
   });

@@ -18,5 +18,3 @@ allowBuilds:
   better-sqlite3: true
   vue-demi: true
   electron: true
-  '@google/genai': false
-  protobufjs: false

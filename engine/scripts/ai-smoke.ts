@@ -1,14 +1,14 @@
 /**
- * 真·Gemini 连通性冒烟测试：用真实 SDK 跑一次 generateContent，验证
- *   API Key 通、responseSchema(大写 Type) 通、res.text → parseAndValidateArticle 通。
+ * 真·模型服务连通性冒烟测试：对当前配置的地址跑一次 chat/completions，验证
+ *   Key 通、结构化输出（json_schema 及降级）通、返回内容 → parseAndValidateArticle 通。
  *
- * 用法：在 engine/.env 配好 STILLSCRIBE_GEMINI_API_KEY 后，
- *   pnpm --filter @stillscribe/engine gemini-smoke
+ * 用法：在 engine/.env 配好 STILLSCRIBE_GEMINI_API_KEY（可选 STILLSCRIBE_AI_BASE_URL / STILLSCRIBE_GEMINI_MODEL）后，
+ *   pnpm --filter @stillscribe/engine ai-smoke
  * 它只发一张 1×1 占位图 + 一句提示词，成本极低；不下载视频、不依赖任务目录。
  */
 import { loadDotEnv } from "../src/env.ts";
 import { resolveAIConfig } from "../src/modules/m7/config.ts";
-import { createGeminiClient } from "../src/modules/m7/geminiClient.ts";
+import { createArticleClient } from "../src/modules/m7/articleClient.ts";
 
 // 1×1 透明 PNG。
 const PNG_1x1 =
@@ -21,8 +21,13 @@ async function main(): Promise<void> {
     console.error("❌ 缺少 STILLSCRIBE_GEMINI_API_KEY —— 请在 engine/.env 配置（见 engine/.env.example）。");
     process.exit(1);
   }
-  console.error(`→ 调用模型 ${cfg.model} …`);
-  const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
+  console.error(`→ 调用 ${cfg.baseUrl} 的模型 ${cfg.model} …`);
+  const client = createArticleClient({
+    baseUrl: cfg.baseUrl,
+    apiKey: cfg.apiKey,
+    model: cfg.model,
+    onStructuredMode: (mode) => console.error(`  结构化输出级别: ${mode}`),
+  });
   const article = await client.generateArticle({
     prompt:
       "This is a connectivity smoke test. Produce a minimal valid article: exactly one page " +

@@ -10,7 +10,7 @@
  *         completed → running(重新导出) → completed
  *         failed/canceled → queued（重试）
  * 半自动(semi)：runToGrids 完成即停在 awaiting_review，等人工回填 article 后再 exportArticle。
- * 全自动(auto)：runToGrids 后直接调 Gemini(M7) 生成 article 草稿再进 awaiting_review（仍让人工校对/换图）；
+ * 全自动(auto)：runToGrids 后直接调模型(M7) 生成 article 草稿再进 awaiting_review（仍让人工校对/换图）；
  *               缺 Key / API 失败则降级——不让任务失败，照样进 awaiting_review 让人工接手（AI 集成文档 §6）。
  */
 import {
@@ -25,7 +25,7 @@ import {
 import { TaskDir, resolveCookiesFile } from "../paths.ts";
 import { runToGrids, runExport, runArticle, type GridsResult } from "./pipeline.ts";
 import { resolveAIConfig } from "../modules/m7/config.ts";
-import { createGeminiClient } from "../modules/m7/geminiClient.ts";
+import { createArticleClient } from "../modules/m7/articleClient.ts";
 import type { EventBus } from "./events.ts";
 import type { TaskStore } from "../store/tasks.ts";
 
@@ -213,11 +213,11 @@ export class Orchestrator {
   private async tryAutoArticle(id: string, grids: GridsResult): Promise<void> {
     const cfg = resolveAIConfig();
     if (!cfg.apiKey) {
-      process.stderr.write(`[m7] 未配置 Gemini API Key，降级半自动 (task ${id})\n`);
+      process.stderr.write(`[m7] 未配置模型 API Key，降级半自动 (task ${id})\n`);
       return;
     }
     try {
-      const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
+      const client = createArticleClient({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
       this.store.update(id, { currentStep: "article" });
       const promptOverride = this.store.get(id)?.params.promptOverride;
       const { article, warnings } = await runArticle(
@@ -226,6 +226,7 @@ export class Orchestrator {
           client,
           videoTitle: grids.videoTitle,
           imageSource: cfg.imageSource,
+          modelLabel: cfg.model,
           ...(promptOverride != null ? { promptOverride } : {}),
         },
         (progress) => {
@@ -293,7 +294,7 @@ export class Orchestrator {
       });
       this.store.update(id, { currentStep: null });
 
-      // auto：直接调 Gemini 生成 article（失败则降级，仍进 awaiting_review）。
+      // auto：直接调模型生成 article（失败则降级，仍进 awaiting_review）。
       // semi：跳过，停在 awaiting_review 等人工回填。
       if (task.params.mode === "auto") {
         await this.tryAutoArticle(id, grids);

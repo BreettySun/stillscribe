@@ -2,7 +2,7 @@
  * P1 命令行入口：tsx src/run.ts <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--work-root <dir>]
  *
  * 打通 M2 下载 → M3 出帧 → M5 去重 → M6 宫格图 → M7 文章 → M8 导出（docx / Markdown / HTML）。
- * M7：--mode auto 调 Gemini 生成 article.json；默认 semi 由人工回填 article.json 后重跑续接 M8。
+ * M7：--mode auto 调模型生成 article.json；默认 semi 由人工回填 article.json 后重跑续接 M8。
  * 每步幂等、产物落盘，可单步重跑（CLAUDE.md 铁律 #7）。
  */
 import { existsSync } from "node:fs";
@@ -12,7 +12,7 @@ import { DEFAULTS, type Article, type ArticleMode, type TaskParams, type VideoQu
 import { loadDotEnv } from "./env.ts";
 import { resolveCookiesFile } from "./paths.ts";
 import { runToGrids, runExport, runArticle } from "./orchestrator/pipeline.ts";
-import { createGeminiClient } from "./modules/m7/geminiClient.ts";
+import { createArticleClient } from "./modules/m7/articleClient.ts";
 import { resolveAIConfig } from "./modules/m7/config.ts";
 
 interface Cli {
@@ -71,16 +71,16 @@ async function runPipeline(cli: Cli): Promise<void> {
   });
   console.error(`[done] ${videoId} — ${videoTitle}: ${frames} 帧, ${grids.length} 张宫格图 → ${td.root}`);
 
-  // M7 全自动(auto)：直接调 Gemini 生成 article.json（配置由 resolveAIConfig 从 engine/.env 读 Key + 代码默认模型）。
+  // M7 全自动(auto)：直接调模型生成 article.json（配置由 resolveAIConfig 从 engine/.env 读 Key + 代码默认模型）。
   if (cli.mode === "auto" && !existsSync(td.articleJson)) {
     const cfg = resolveAIConfig();
     if (!cfg.apiKey) {
       console.error("\n⏸  --mode auto 需在 engine/.env 配置 STILLSCRIBE_GEMINI_API_KEY；未设置，降级为半自动（见下）。");
     } else {
-      const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
+      const client = createArticleClient({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
       const { warnings: w } = await runArticle(
         td,
-        { client, videoTitle, imageSource: cfg.imageSource },
+        { client, videoTitle, imageSource: cfg.imageSource, modelLabel: cfg.model },
         ({ message }) => console.error(`[article] ${message ?? ""}`),
       );
       for (const m of w) console.error(`     [warn] ${m}`);
@@ -114,7 +114,7 @@ async function runPipeline(cli: Cli): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  loadDotEnv(); // 加载 engine/.env（Gemini Key/模型），供 --mode auto 使用。
+  loadDotEnv(); // 加载 engine/.env（模型 Key/地址/模型名），供 --mode auto 使用。
   await runPipeline(parseArgs(process.argv.slice(2)));
 }
 
