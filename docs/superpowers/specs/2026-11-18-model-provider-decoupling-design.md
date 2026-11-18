@@ -333,3 +333,4 @@ M7 ──▶ 读当前配置 + 取该地址的 Key ──▶ 通用客户端 ─
 - **§5.3**：调用外部 CLI（yt-dlp 及其拉起的 deno、ffmpeg / ffprobe）时，从子进程环境中去掉模型服务 Key（`STILLSCRIBE_AI_KEYS`、`STILLSCRIBE_AI_API_KEY`、`STILLSCRIBE_GEMINI_API_KEY`）与引擎令牌 `STILLSCRIBE_TOKEN`。
 - **§5.3**：无法读取的 `ai-keys.enc`（解密失败、内容非法，或加载时加密不可用）在写入新文件前改名保留为 `ai-keys.enc.unreadable-<ts>`，绝不直接覆盖。
 - **§8**：Key 文件的加载 / 迁移 / 写入决策是 `shared/ai.ts` 里的纯函数（`planKeyLoad`、`decodeKeyFile`、`planKeySave`），有逐分支单测；`electron/src/main/aiKeys.ts` 只做 I/O。
+- §5.2（实测后补，2026-11-18）：模型给的 `image` 不是合法帧时，先按水印的常见写法确定性纠正（最常见的是把水印 `HH:MM:SS.mmm` 错写成"分_秒_毫秒"），候选值必须是确实存在的帧才采用；还原不出来的才标记待人工换图。该现象在兼容接口与原生接口上都会出现，与本次解耦无关。实现见 `engine/src/modules/m7/timestamps.ts`。

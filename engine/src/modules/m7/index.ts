@@ -14,6 +14,7 @@ import { TaskDir, matchFiles } from "../../paths.ts";
 import { collectImages } from "./images.ts";
 import { renderPrompt } from "./prompt.ts";
 import { findSubtitlePath, loadCleanSubtitles } from "./subtitles.ts";
+import { repairImageTimestamp } from "./timestamps.ts";
 import type { ArticleClient } from "./articleClient.ts";
 import { AIRequestError } from "./chat.ts";
 
@@ -98,10 +99,16 @@ export async function generateArticle(opts: GenerateOptions): Promise<GenerateRe
   );
   const article = await generateWithRetry(client, { images, subtitles, prompt }, opts.retries ?? 2);
 
-  // 语义校验（§2）：image 时间戳须在帧集合内，否则标记待人工换图（不阻断，进 awaiting_review 处理）。
+  // 语义校验（§2）：image 时间戳须在帧集合内。模型常把水印 HH:MM:SS.mmm 错写成 分_秒_毫秒，
+  // 这类可还原的先纠正（见 timestamps.ts）；还原不出来的才标记待人工换图（不阻断，进 awaiting_review 处理）。
   const valid = await frameTimestamps(td);
   for (const [i, p] of article.pages.entries()) {
-    if (!valid.has(p.image)) {
+    if (valid.has(p.image)) continue;
+    const repaired = repairImageTimestamp(p.image, valid);
+    if (repaired) {
+      warnings.push(`pages[${i}].image="${p.image}" 不是合法帧，已按水印写法纠正为 "${repaired}"`);
+      p.image = repaired;
+    } else {
       warnings.push(`pages[${i}].image="${p.image}" 不在帧集合内，待人工换图`);
     }
   }

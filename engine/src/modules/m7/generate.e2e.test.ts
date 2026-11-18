@@ -90,6 +90,27 @@ describe("generateArticle 端到端（stub client）", () => {
     expect(warnings[0]).toContain("09_09_09");
   });
 
+  it("模型把时间戳写成 分_秒_毫秒 时，纠正为真实存在的帧并写入 article.json", async () => {
+    const bad: Article = structuredClone(goodArticle);
+    bad.pages[0]!.image = "00_02_000"; // 水印 00:00:02.000 被写成三段
+    bad.pages[1]!.image = "00_00_00"; // 本来就对
+    const { article, warnings } = await generateArticle({
+      taskDir: td,
+      videoTitle: "Test Video",
+      imageSource: "frames",
+      client: stubClient(bad, {}),
+    });
+    expect(article.pages[0]!.image).toBe("00_00_02");
+    expect(article.pages[1]!.image).toBe("00_00_00");
+    const onDisk = JSON.parse(readFileSync(td.articleJson, "utf-8")) as Article;
+    expect(onDisk.pages[0]!.image).toBe("00_00_02");
+    // 纠正要留痕（原值与新值都在），但不算"待人工换图"。
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("00_02_000");
+    expect(warnings[0]).toContain("00_00_02");
+    expect(warnings[0]).not.toContain("待人工换图");
+  });
+
   it("imageSource=grids 时读 03_grids 的 jpg", async () => {
     writeFileSync(path.join(td.grids, "grid_001.jpg"), "gridbytes");
     const captured: { input?: GenerateArticleInput } = {};
