@@ -16,7 +16,7 @@ import type { ArticleClient, GenerateArticleInput } from "./articleClient.ts";
 let root: string;
 let td: TaskDir;
 
-beforeEach(() => {
+beforeEach(async () => {
   root = mkdtempSync(path.join(os.tmpdir(), "m7-e2e-"));
   td = TaskDir.create(root, "vid123", "Test Video");
   // 三秒帧：01_hd 与 02_webp 各 3 张（内容无所谓，stub 不看像素）。
@@ -25,7 +25,7 @@ beforeEach(() => {
     writeFileSync(path.join(td.webp, `${ts}.webp`), "webpbytes");
   }
   // 代表帧清单（frames 策略读它）。
-  writeManifest(td.representativesJson, ["00_00_00", "00_00_02"], 15);
+  await writeManifest(td.representativesJson, ["00_00_00", "00_00_02"], 15);
   // 字幕。
   writeFileSync(
     path.join(td.source, "video.en.srt"),
