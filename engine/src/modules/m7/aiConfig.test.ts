@@ -54,6 +54,19 @@ describe("AIConfig", () => {
 		expect(d.read().keyedBaseUrls).toEqual([AI_DEFAULTS.baseUrl]);
 	});
 
+	it("环境地址非法时丢弃单 Key，不绑定到默认地址", () => {
+		const c = new AIConfig({ STILLSCRIBE_AI_BASE_URL: "http://my-proxy.example/v1", STILLSCRIBE_AI_API_KEY: "k" }, mem());
+		expect(c.resolve().apiKey).toBeUndefined();
+		expect(c.read().hasApiKey).toBe(false);
+		expect(c.read().keyedBaseUrls).toEqual([]);
+	});
+
+	it("环境地址为空白时，单 Key 属于默认地址", () => {
+		const c = new AIConfig({ STILLSCRIBE_AI_BASE_URL: "   ", STILLSCRIBE_AI_API_KEY: "k" }, mem());
+		expect(c.resolve().apiKey).toBe("k");
+		expect(c.read().keyedBaseUrls).toEqual([AI_DEFAULTS.baseUrl]);
+	});
+
 	it("STILLSCRIBE_AI_KEYS 非法 JSON → 视为空表，不抛错", () => {
 		const c = new AIConfig({ STILLSCRIBE_AI_KEYS: "{not json" }, mem());
 		expect(c.read().keyedBaseUrls).toEqual([]);

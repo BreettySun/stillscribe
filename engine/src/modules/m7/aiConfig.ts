@@ -66,8 +66,11 @@ export class AIConfig {
 		if (legacy) envKeys[AI_DEFAULTS.baseUrl] = legacy;
 		const single = nonBlank(env.STILLSCRIBE_AI_API_KEY);
 		if (single) {
-			const n = normalizeBaseUrl(env.STILLSCRIBE_AI_BASE_URL || AI_DEFAULTS.baseUrl);
-			envKeys[n.ok ? n.baseUrl : AI_DEFAULTS.baseUrl] = single;
+			// 地址未设/空白 → 默认地址；地址非空但非法 → 丢弃这把 Key（绝不改绑到默认地址，否则会把别家的 Key 发给默认服务）。
+			const rawBase = nonBlank(env.STILLSCRIBE_AI_BASE_URL);
+			const n = normalizeBaseUrl(rawBase ?? AI_DEFAULTS.baseUrl);
+			if (n.ok) envKeys[n.baseUrl] = single;
+			else process.stderr.write("[m7] STILLSCRIBE_AI_BASE_URL 不合法，已忽略 STILLSCRIBE_AI_API_KEY\n");
 		}
 		this.envKeys = envKeys;
 	}
