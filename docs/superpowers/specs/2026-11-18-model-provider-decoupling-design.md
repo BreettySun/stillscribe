@@ -320,3 +320,16 @@ M7 ──▶ 读当前配置 + 取该地址的 Key ──▶ 通用客户端 ─
 7. Electron 开发态启用与打包后相同的 Key 保存链路（原来是关闭的）。
 8. 环境变量里的旧名字继续可用，作为兜底。
 9. 纯 Web 开发模式下不能在界面里填 Key。
+
+## 12. 实施后的修订（2026-11-18）
+
+整分支审阅后按实现修订如下，前文各节保留原样，以本节为准：
+
+- **§5.3 / §5.4**：`AISettings` 不再给"已有 Key 的地址列表"，改为按地址给出 Key 来源 `keySources: Record<string, "saved" | "env">`（同一地址表与环境变量都有时为 `"saved"`）。对话框据此对任意地址显示"已保存 / 来自 engine/.env / 未设置"，"清除"只对 `"saved"` 且能写 Key 的形态出现。
+- **§5.5**："测试连接"总是从 `json_schema` 起步探测结构化级别，并用测得的结果覆盖已记住的级别（一次偶发的 400 造成的降级可借此恢复）。
+- **§5.3**：未打包的 Electron 开发态使用独立的 userData 目录 `stillscribe-dev`（命令行显式传 `--user-data-dir` 时以其为准），不与打包版共用文件。
+- **§5.2**：客户端不跟随重定向；任何 3xx 按配置错误报告（"地址发生了重定向，请填写最终地址"），不发第二次请求。
+- **§5.2**：任务被取消时中止进行中的模型请求（错误类别 `aborted`，不重试），任务落 `canceled`，不写失败原因、不降级到半自动。
+- **§5.3**：调用外部 CLI（yt-dlp 及其拉起的 deno、ffmpeg / ffprobe）时，从子进程环境中去掉模型服务 Key（`STILLSCRIBE_AI_KEYS`、`STILLSCRIBE_AI_API_KEY`、`STILLSCRIBE_GEMINI_API_KEY`）与引擎令牌 `STILLSCRIBE_TOKEN`。
+- **§5.3**：无法读取的 `ai-keys.enc`（解密失败、内容非法，或加载时加密不可用）在写入新文件前改名保留为 `ai-keys.enc.unreadable-<ts>`，绝不直接覆盖。
+- **§8**：Key 文件的加载 / 迁移 / 写入决策是 `shared/ai.ts` 里的纯函数（`planKeyLoad`、`decodeKeyFile`、`planKeySave`），有逐分支单测；`electron/src/main/aiKeys.ts` 只做 I/O。
