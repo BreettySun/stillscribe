@@ -129,7 +129,7 @@ export class Orchestrator {
   setArticle(id: string, article: Task["article"]): Task {
     const task = this.store.get(id);
     if (!task) throw new Error(`任务不存在: ${id}`);
-    return this.store.update(id, { article: article ?? null });
+    return this.store.update(id, { article: article ?? null, autoError: null });
   }
 
   /**
@@ -219,6 +219,7 @@ export class Orchestrator {
     const cfg = this.ai.resolve();
     if (!cfg.ready) {
       process.stderr.write(`[m7] 未配置模型 API Key，降级半自动 (task ${id})\n`);
+      this.store.update(id, { autoError: "模型服务未配置 API Key，已转为人工回填" });
       return;
     }
     try {
@@ -246,11 +247,11 @@ export class Orchestrator {
         },
       );
       for (const w of warnings) process.stderr.write(`[m7][warn] ${w} (task ${id})\n`);
-      this.store.update(id, { article, currentStep: null });
+      this.store.update(id, { article, currentStep: null, autoError: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[m7] 全自动失败，降级半自动 (task ${id}): ${msg}\n`);
-      this.store.update(id, { currentStep: null });
+      this.store.update(id, { currentStep: null, autoError: msg });
     }
   }
 

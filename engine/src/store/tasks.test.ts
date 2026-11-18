@@ -63,6 +63,43 @@ describe("TaskStore", () => {
     expect(s.update(t.id, { status: "completed" }).outputs).toEqual(outputs);
   });
 
+  it("autoError 可写入、读取、清空", () => {
+    const s = freshStore();
+    const t = s.create(PARAMS);
+    expect(t).not.toHaveProperty("autoError");
+    expect(s.update(t.id, { autoError: "x" }).autoError).toBe("x");
+    expect(s.get(t.id)!.autoError).toBe("x");
+    // 未传 autoError 的 update 不清空它
+    expect(s.update(t.id, { status: "running" }).autoError).toBe("x");
+    expect(s.update(t.id, { autoError: null })).not.toHaveProperty("autoError");
+    expect(s.get(t.id)).not.toHaveProperty("autoError");
+  });
+
+  it("旧库缺 autoError 列时自动补上", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "stillscribe-store-"));
+    const file = path.join(dir, "tasks.db");
+    const old = new Database(file);
+    old.exec(`
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY, params TEXT NOT NULL, status TEXT NOT NULL, currentStep TEXT,
+        videoTitle TEXT, workDir TEXT NOT NULL DEFAULT '', article TEXT, outputs TEXT,
+        error TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+      );
+    `);
+    old
+      .prepare(
+        `INSERT INTO tasks (id, params, status, workDir, createdAt, updatedAt)
+         VALUES ('t1', ?, 'awaiting_review', '/w', 'now', 'now')`,
+      )
+      .run(JSON.stringify(PARAMS));
+    old.close();
+
+    const s = new TaskStore(file);
+    expect(s.get("t1")).not.toHaveProperty("autoError");
+    expect(s.update("t1", { autoError: "原因" }).autoError).toBe("原因");
+    s.close();
+  });
+
   it("旧库迁移：补 outputs 列，遗留的 outputDocx 读成 outputs.docx", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "stillscribe-store-"));
     const file = path.join(dir, "tasks.db");

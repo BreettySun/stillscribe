@@ -28,6 +28,8 @@ interface Row {
   /** 旧库遗留列：新库不建。仅在 outputs 为空时读它，映射为 outputs.docx。 */
   outputDocx?: string | null;
   error: string | null;
+  /** 全自动生成降级为人工回填的原因。 */
+  autoError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,6 +49,7 @@ function rowToTask(r: Row): Task {
   if (r.outputs) task.outputs = JSON.parse(r.outputs) as ExportOutputs;
   else if (r.outputDocx) task.outputs = { docx: r.outputDocx };
   if (r.error) task.error = r.error;
+  if (r.autoError) task.autoError = r.autoError;
   return task;
 }
 
@@ -60,6 +63,8 @@ export interface TaskPatch {
   /** 整体替换（不做按格式合并）。 */
   outputs?: ExportOutputs;
   error?: string | null;
+  /** 全自动降级原因；null 清空。 */
+  autoError?: string | null;
 }
 
 export class TaskStore {
@@ -79,6 +84,7 @@ export class TaskStore {
         article     TEXT,
         outputs     TEXT,
         error       TEXT,
+        autoError   TEXT,
         createdAt   TEXT NOT NULL,
         updatedAt   TEXT NOT NULL
       );
@@ -88,6 +94,10 @@ export class TaskStore {
     const cols = this.db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[];
     if (!cols.some((c) => c.name === "outputs")) {
       this.db.exec(`ALTER TABLE tasks ADD COLUMN outputs TEXT`);
+    }
+    // 迁移：旧库补 autoError 列。
+    if (!cols.some((c) => c.name === "autoError")) {
+      this.db.exec(`ALTER TABLE tasks ADD COLUMN autoError TEXT`);
     }
   }
 
@@ -128,6 +138,8 @@ export class TaskStore {
         patch.article === undefined ? current.article ?? null : patch.article,
       outputs: patch.outputs ?? current.outputs ?? null,
       error: patch.error === undefined ? current.error ?? null : patch.error,
+      autoError:
+        patch.autoError === undefined ? current.autoError ?? null : patch.autoError,
       updatedAt: new Date().toISOString(),
     };
 
@@ -136,7 +148,7 @@ export class TaskStore {
         `UPDATE tasks SET
            status=@status, currentStep=@currentStep, videoTitle=@videoTitle,
            workDir=@workDir, article=@article, outputs=@outputs,
-           error=@error, updatedAt=@updatedAt
+           error=@error, autoError=@autoError, updatedAt=@updatedAt
          WHERE id=@id`,
       )
       .run({
@@ -148,6 +160,7 @@ export class TaskStore {
         article: merged.article ? JSON.stringify(merged.article) : null,
         outputs: merged.outputs ? JSON.stringify(merged.outputs) : null,
         error: merged.error,
+        autoError: merged.autoError,
         updatedAt: merged.updatedAt,
       });
     return this.get(id)!;
