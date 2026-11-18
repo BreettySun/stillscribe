@@ -130,7 +130,7 @@ describe("模型服务设置路由", () => {
 		const res = await a.inject({
 			method: "PUT",
 			url: "/settings/ai/key",
-			payload: '{"apiKey":"sk-secret"',
+			payload: '{"apiKey":sk-secret}',
 			headers: { host: "127.0.0.1", authorization: "Bearer t", "content-type": "application/json" },
 		});
 		expect(res.statusCode).toBe(400);
