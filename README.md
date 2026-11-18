@@ -58,7 +58,7 @@ article/
 ### 环境要求
 
 - macOS，Apple 芯片
-- Node.js 22 或更新的 LTS
+- Node.js 22.12 或更新的 LTS（Electron 43 的安装器要求）
 - [pnpm](https://pnpm.io/)
 
 ffmpeg、yt-dlp 这些工具**不需要自己安装**，下面的 `setup-tools` 会把固定版本下载到仓库的 `bin/` 目录。
@@ -195,7 +195,7 @@ docs/       架构文档与开发计划
 | `pnpm dist` | 打包 macOS 应用 |
 | `pnpm refresh-cookies` | 手动从浏览器刷新 YouTube cookie |
 
-技术栈：Electron 33、Vue 3、Vite 6、Naive UI、Pinia、Fastify 5、TypeScript 5、better-sqlite3、sharp、docx。
+技术栈：Electron 43、Vue 3、Vite 6、Naive UI、Pinia、Fastify 5、TypeScript 5、better-sqlite3、sharp、docx。
 
 提交代码之前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。项目的硬性约束写在 [CLAUDE.md](CLAUDE.md)，设计取舍见 [docs/](docs/) 下的架构文档。
 

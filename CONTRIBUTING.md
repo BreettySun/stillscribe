@@ -9,7 +9,7 @@
 
 ## 搭建开发环境
 
-需要 macOS（目前只支持 Apple 芯片）、Node.js 22 或更新的 LTS、pnpm。
+需要 macOS（目前只支持 Apple 芯片）、Node.js 22.12 或更新的 LTS、pnpm。
 
 ```bash
 pnpm install

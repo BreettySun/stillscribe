@@ -6,23 +6,23 @@
   "description": "视频生成图文文章工具 — Electron 套壳（P3b）",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "install-electron && electron-vite dev",
     "build": "electron-vite build",
     "build:engine": "node scripts/build-engine.mjs",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "dist": "electron-vite build && pnpm build:engine && pnpm rebuild:native && electron-builder --mac --arm64",
-    "preview": "electron-vite preview",
+    "preview": "install-electron && electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.0",
+    "better-sqlite3": "^12.11.1",
     "sharp": "^0.35.1"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.0",
+    "@electron/rebuild": "^4.2.1",
     "@types/node": "^22.19.21",
     "@vitejs/plugin-vue": "^5.2.1",
-    "electron": "^33.2.1",
+    "electron": "^43.8.10",
     "electron-builder": "^25.1.8",
     "electron-vite": "^3.1.0",
     "esbuild": "^0.24.0",
