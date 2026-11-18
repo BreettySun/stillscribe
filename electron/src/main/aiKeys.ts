@@ -6,7 +6,7 @@
  * STILLSCRIBE_AI_KEYS 注入，运行期经 PUT /settings/ai/key 更新。
  *
  * 任何 Key 或解密内容都不得写入 stdout/stderr（含错误路径）。须在 app ready 之后调用（safeStorage 依赖之）。
- * 开发态与打包后行为一致。
+ * 开发态与打包后行为一致（未打包时 userData 是独立的 stillscribe-dev 目录，见 index.ts）。
  *
  * 本文件只做 I/O：读文件 / 解密得到输入，调 shared/ai.ts 的纯函数（planKeyLoad / decodeKeyFile / planKeySave）
  * 拿到计划，再执行计划里的写入、改名、删除。删哪个、改名哪个、要不要写，全部由纯函数决定（有单测）。

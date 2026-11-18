@@ -34,6 +34,13 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
 // 统一显示名，使 userData = "Application Support/stillscribe"。必须在 app ready 前调用。
 app.setName("stillscribe");
 
+// 未打包的开发态用独立的 userData（Application Support/stillscribe-dev）：不读写、不迁移、不删除已安装的打包版
+// 的文件（ai-keys.enc 等；两种二进制也未必能解开对方经钥匙串加密的文件）。显式传了 --user-data-dir 时以它为准。
+// 必须在任何 app.getPath("userData") 之前、app ready 之前设置。
+if (!app.isPackaged && !app.commandLine.hasSwitch("user-data-dir")) {
+	app.setPath("userData", path.join(app.getPath("appData"), "stillscribe-dev"));
+}
+
 /**
  * 工作根（与引擎一致）：可被 STILLSCRIBE_WORK_ROOT 覆盖。
  * - 打包后：app.getPath("userData")/work（仓库目录不存在/不可写）。
