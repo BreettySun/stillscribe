@@ -24,7 +24,7 @@ import {
 } from "@shared/types";
 import { TaskDir, resolveCookiesFile } from "../paths.ts";
 import { runToGrids, runExport, runArticle, type GridsResult } from "./pipeline.ts";
-import { resolveAIConfig } from "../modules/m7/config.ts";
+import { AIConfig } from "../modules/m7/aiConfig.ts";
 import { createArticleClient } from "../modules/m7/articleClient.ts";
 import type { EventBus } from "./events.ts";
 import type { TaskStore } from "../store/tasks.ts";
@@ -47,18 +47,23 @@ export interface OrchestratorOptions {
   workRoot: string;
   /** --cookies-from-browser（可选）。 */
   browser?: string;
+  /** 模型服务配置；缺省只读环境变量（测试/命令行）。 */
+  ai?: AIConfig;
 }
 
 export class Orchestrator {
   private readonly queue: string[] = [];
   private readonly running = new Map<string, AbortController>();
   private active = false;
+  private readonly ai: AIConfig;
 
   constructor(
     private readonly store: TaskStore,
     private readonly bus: EventBus,
     private readonly opts: OrchestratorOptions,
-  ) {}
+  ) {
+    this.ai = opts.ai ?? new AIConfig(process.env);
+  }
 
   /** 提交单个任务，入队并触发处理。 */
   submit(params: TaskParams): Task {
@@ -211,13 +216,19 @@ export class Orchestrator {
    * 任何缺配置 / API 失败都【不让任务失败】，只记日志并降级——仍进 awaiting_review 让人工接手（§6）。
    */
   private async tryAutoArticle(id: string, grids: GridsResult): Promise<void> {
-    const cfg = resolveAIConfig();
-    if (!cfg.apiKey) {
+    const cfg = this.ai.resolve();
+    if (!cfg.ready) {
       process.stderr.write(`[m7] 未配置模型 API Key，降级半自动 (task ${id})\n`);
       return;
     }
     try {
-      const client = createArticleClient({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+      const client = createArticleClient({
+        baseUrl: cfg.baseUrl,
+        model: cfg.model,
+        ...(cfg.apiKey ? { apiKey: cfg.apiKey } : {}),
+        ...(cfg.structuredMode ? { structuredMode: cfg.structuredMode } : {}),
+        onStructuredMode: (mode) => this.ai.rememberStructuredMode(cfg.baseUrl, cfg.model, mode),
+      });
       this.store.update(id, { currentStep: "article" });
       const promptOverride = this.store.get(id)?.params.promptOverride;
       const { article, warnings } = await runArticle(

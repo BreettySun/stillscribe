@@ -13,6 +13,7 @@ import {
 } from "./auth.ts";
 import { engineTokenPath } from "./paths.ts";
 import { buildServer } from "./server.ts";
+import { AIConfig } from "./modules/m7/aiConfig.ts";
 import { TaskStore } from "./store/tasks.ts";
 import { SettingsStore } from "./store/settings.ts";
 import { EventBus } from "./orchestrator/events.ts";
@@ -93,6 +94,7 @@ describe("HTTP 接口鉴权", () => {
 			orchestrator: new Orchestrator(store, bus, { workRoot: tmpdir() }),
 			settings: new SettingsStore(":memory:"),
 			workRoot: tmpdir(),
+			ai: new AIConfig({}),
 			auth: { token: TOKEN, allowedOrigins: [ORIGIN, "null"] },
 		});
 		return app;

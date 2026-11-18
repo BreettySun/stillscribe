@@ -253,7 +253,7 @@ export interface Task {
 //  POST /tasks/:id/cancel                                     -> Task
 //
 //  --- AI 全自动状态（M7，只读；model/Key 由代码侧配置 engine/.env，不经 HTTP 修改，绝不回传明文）---
-//  GET  /settings/ai                                          -> AISettings        (hasApiKey + model + imageSource)
+//  GET  /settings/ai                                          -> AISettings        (baseUrl/model/imageSource + hasApiKey/keySource/ready/keyedBaseUrls)
 //
 //  --- 静态资源（给浏览器看图；引擎按任务 workDir 内取，含路径穿越防护）---
 //  GET  /static/:id/grids/:file   -> image/jpeg   宫格图字节（03_grids/<file>）
@@ -329,20 +329,29 @@ export const UI_DEFAULTS: UISettings = {
 };
 
 /**
- * AI（全自动 M7）设置。
- * 【铁律 #6】API Key 只在引擎本地（Electron safeStorage / 引擎私有存储），
- * 绝不出现在本结构里、绝不回传渲染进程明文——这里只暴露"是否已配置"。
+ * AI（全自动 M7）设置：模型服务地址 / 模型 / 喂图策略，以及当前地址 Key 的"状态"。
+ * 【铁律 #6】API Key 只在引擎内存里（按地址绑定的 Key 表），
+ * 绝不出现在本结构里、绝不回传渲染进程明文——这里只暴露"是否有 Key、来自哪里"。
  */
 export interface AISettings {
-	/** 是否已配置 API Key（只读探测，绝不回传明文）。 */
-	hasApiKey: boolean;
+	/** 模型服务地址（已规范化）。 */
+	baseUrl: string;
 	/** 生成所用模型。 */
-	model: GeminiModel;
+	model: AIModel;
 	/** 喂图策略（见 AIImageSource）。 */
 	imageSource: AIImageSource;
+	/** 当前地址是否有 Key（只读探测，绝不回传明文）。 */
+	hasApiKey: boolean;
+	/** 当前地址 Key 的来源。 */
+	keySource: AIKeySource;
+	/** 是否可发起请求：有 Key，或当前地址是回环地址（本机服务可不要 Key）。 */
+	ready: boolean;
+	/** 所有已有 Key 的地址（含来自环境变量的）。 */
+	keyedBaseUrls: string[];
 }
 
-export const AI_DEFAULTS: Omit<AISettings, "hasApiKey"> = {
+export const AI_DEFAULTS: Pick<AISettings, "baseUrl" | "model" | "imageSource"> = {
+	baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
 	model: "gemini-2.5-flash",
 	imageSource: "grids",
 };

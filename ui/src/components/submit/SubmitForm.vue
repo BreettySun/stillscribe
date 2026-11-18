@@ -24,7 +24,7 @@ const promptText = ref("");
 const aiHasKey = ref(false);
 onMounted(async () => {
 	try {
-		aiHasKey.value = (await api.getAISettings()).hasApiKey;
+		aiHasKey.value = (await api.getAISettings()).ready;
 	} catch {
 		/* 引擎未就绪/旧版无此端点 → 视为未配置，auto 不可选 */
 	}

@@ -16,6 +16,7 @@ import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
 import { buildServer } from "./server.ts";
 import { resolveAuth } from "./auth.ts";
+import { AIConfig } from "./modules/m7/aiConfig.ts";
 
 loadDotEnv(); // 先加载 engine/.env（Gemini Key/模型等），再读各 env 默认。
 const workRoot = resolveWorkRoot();
@@ -29,11 +30,13 @@ const auth = resolveAuth(workRoot); // 须在 workRoot 建好之后：自动生�
 const store = new TaskStore(path.join(workRoot, "tasks.db"));
 const settings = new SettingsStore(path.join(workRoot, "settings.db"));
 const bus = new EventBus();
+const ai = new AIConfig(process.env, settings);
 const orchestrator = new Orchestrator(store, bus, {
   workRoot,
+  ai,
   ...(browser ? { browser } : {}),
 });
-const app = buildServer({ store, bus, orchestrator, settings, workRoot, auth });
+const app = buildServer({ store, bus, orchestrator, settings, workRoot, auth, ai });
 
 orchestrator.recover();
 

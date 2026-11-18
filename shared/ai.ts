@@ -1,7 +1,10 @@
 // 模型服务（OpenAI 兼容）相关的纯函数与常量。
 // 引擎、Electron 主进程、界面三端共用：不得 import 任何 Node 或浏览器专有模块（全局 URL 可用）。
 
-export const DEFAULT_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+import { AI_DEFAULTS } from "./types";
+
+/** 默认模型服务地址；字面量只在 AI_DEFAULTS 里有一处。 */
+export const DEFAULT_AI_BASE_URL = AI_DEFAULTS.baseUrl;
 
 export type NormalizeResult = { ok: true; baseUrl: string } | { ok: false; error: string };
 

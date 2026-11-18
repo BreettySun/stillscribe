@@ -33,7 +33,7 @@ import { isLoopbackHost, parseBearer, tokenMatches, type AuthConfig } from "./au
 import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
-import { readAISettings } from "./modules/m7/config.ts";
+import type { AIConfig } from "./modules/m7/aiConfig.ts";
 import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -49,6 +49,8 @@ export interface ServerDeps {
 	workRoot: string;
 	/** 接口鉴权配置（必填：没有"不鉴权"的运行方式）。 */
 	auth: AuthConfig;
+	/** 模型服务配置（地址/模型/Key 表）。 */
+	ai: AIConfig;
 }
 
 const THEME_MODES: readonly ThemeMode[] = ["auto", "light", "dark"];
@@ -165,7 +167,7 @@ async function listFrames(workDir: string): Promise<Frame[]> {
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
-	const { store, bus, orchestrator, settings, workRoot, auth } = deps;
+	const { store, bus, orchestrator, settings, workRoot, auth, ai } = deps;
 	const app = Fastify({ logger: false });
 	const allowedOrigins = new Set(auth.allowedOrigins);
 
@@ -334,7 +336,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
 	// ---- AI 全自动状态（M7，只读）。model/Key 由代码侧配置（engine/.env），不经此修改；
 	//       仅暴露"是否已配置 Key + 当前 model/imageSource"，绝不回传明文（铁律 #6）----
-	app.get("/settings/ai", () => readAISettings());
+	app.get("/settings/ai", () => ai.read());
 
 	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----
 	app.get(

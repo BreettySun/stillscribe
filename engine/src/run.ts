@@ -13,7 +13,7 @@ import { loadDotEnv } from "./env.ts";
 import { resolveCookiesFile } from "./paths.ts";
 import { runToGrids, runExport, runArticle } from "./orchestrator/pipeline.ts";
 import { createArticleClient } from "./modules/m7/articleClient.ts";
-import { resolveAIConfig } from "./modules/m7/config.ts";
+import { AIConfig } from "./modules/m7/aiConfig.ts";
 
 interface Cli {
   url: string;
@@ -71,13 +71,18 @@ async function runPipeline(cli: Cli): Promise<void> {
   });
   console.error(`[done] ${videoId} — ${videoTitle}: ${frames} 帧, ${grids.length} 张宫格图 → ${td.root}`);
 
-  // M7 全自动(auto)：直接调模型生成 article.json（配置由 resolveAIConfig 从 engine/.env 读 Key + 代码默认模型）。
+  // M7 全自动(auto)：直接调模型生成 article.json（配置由 AIConfig 从 engine/.env 读 Key + 代码默认模型）。
   if (cli.mode === "auto" && !existsSync(td.articleJson)) {
-    const cfg = resolveAIConfig();
-    if (!cfg.apiKey) {
-      console.error("\n⏸  --mode auto 需在 engine/.env 配置 STILLSCRIBE_GEMINI_API_KEY；未设置，降级为半自动（见下）。");
+    const cfg = new AIConfig(process.env).resolve();
+    if (!cfg.ready) {
+      console.error("\n⏸  --mode auto 需在 engine/.env 配置 STILLSCRIBE_AI_API_KEY；未设置，降级为半自动（见下）。");
     } else {
-      const client = createArticleClient({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+      const client = createArticleClient({
+        baseUrl: cfg.baseUrl,
+        model: cfg.model,
+        ...(cfg.apiKey ? { apiKey: cfg.apiKey } : {}),
+        ...(cfg.structuredMode ? { structuredMode: cfg.structuredMode } : {}),
+      });
       const { warnings: w } = await runArticle(
         td,
         { client, videoTitle, imageSource: cfg.imageSource, modelLabel: cfg.model },
