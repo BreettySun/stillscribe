@@ -125,7 +125,7 @@ describe("模型服务设置路由", () => {
 		expect(res.body).not.toContain("sk-secret");
 	});
 
-	it("请求体不是合法 JSON 时 → 400，响应不回显原文", async () => {
+	it("请求体不是合法 JSON 时 → 400，响应不含请求体里的 Key（防 Fastify 升级后开始回显解析错误原文）", async () => {
 		const a = makeApp();
 		const res = await a.inject({
 			method: "PUT",

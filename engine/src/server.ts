@@ -212,10 +212,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
 	app.setErrorHandler((err: unknown, _req, reply) => {
 		const status = err instanceof HttpError ? err.statusCode : 400;
-		let message = err instanceof Error ? err.message : String(err);
-		// 请求体解析失败（非法 JSON 等）的原文可能带出请求体片段（含 Key），一律换成固定文案
-		const code = (err as { code?: unknown }).code;
-		if (typeof code === "string" && code.startsWith("FST_ERR_CTP")) message = "请求体无效";
+		const message = err instanceof Error ? err.message : String(err);
 		reply.code(status).send({ error: message });
 	});
 
