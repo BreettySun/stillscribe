@@ -162,4 +162,22 @@ describe("模型服务设置路由", () => {
 		expect(body).toMatchObject({ ok: true, seesImage: true, structuredMode: "json_object" });
 		expect(lastAI!.resolve().structuredMode).toBe("json_object");
 	});
+
+	it("Key 不跨地址：给 A 存了 Key、当前地址改为 B，测试连接时 B 收不到 Authorization，A 收不到任何请求", async () => {
+		const fakeA = await startFake(() => ok("ok"));
+		const fakeB = await startFake((req) => (req.body.response_format ? ok('{"color":"red"}') : ok("ok")));
+		const a = makeApp();
+		expect((await call(a, "POST", "/settings/ai", { baseUrl: fakeA.baseUrl })).statusCode).toBe(200);
+		expect((await call(a, "PUT", "/settings/ai/key", { baseUrl: fakeA.baseUrl, apiKey: "sk-for-a" })).statusCode).toBe(200);
+		expect((await call(a, "POST", "/settings/ai", { baseUrl: fakeB.baseUrl })).statusCode).toBe(200);
+		const res = await call(a, "POST", "/settings/ai/test");
+		expect(res.statusCode).toBe(200);
+		expect((res.json() as AITestResult).ok).toBe(true);
+		expect(fakeB.requests.length).toBeGreaterThan(0);
+		for (const r of fakeB.requests) {
+			expect(r.headers.authorization).toBeUndefined();
+			expect(JSON.stringify(r)).not.toContain("sk-for-a");
+		}
+		expect(fakeA.requests).toHaveLength(0);
+	});
 });
