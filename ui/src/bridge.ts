@@ -38,3 +38,21 @@ export async function refreshCookies(browser: string): Promise<{ kept: number }>
   }
   return (await res.json()) as { kept: number };
 }
+
+/** 是否能把 API Key 存进系统钥匙串（仅 Electron；纯 Web 下 Key 在 engine/.env 配置）。 */
+export const canStoreAIKey: boolean = !!bridgeImpl?.setAIKey;
+
+/** 写入 / 清除（apiKey 为 null）某地址的 Key。纯 Web 下不可用。 */
+export async function setAIKey(
+	baseUrl: string,
+	apiKey: string | null,
+): Promise<{ persisted: boolean }> {
+	if (!bridgeImpl?.setAIKey) throw new Error("当前环境不支持保存 Key");
+	try {
+		return await bridgeImpl.setAIKey(baseUrl, apiKey);
+	} catch (e) {
+		// Electron 会给 IPC 错误加 "Error invoking remote method '...': Error: " 前缀，只留原文。
+		const msg = e instanceof Error ? e.message : String(e);
+		throw new Error(msg.replace(/^Error invoking remote method '[^']*':\s*(?:Error:\s*)?/, ""));
+	}
+}

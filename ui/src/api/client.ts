@@ -4,6 +4,8 @@
  */
 import type {
 	AISettings,
+	AISettingsPatch,
+	AITestResult,
 	Article,
 	BatchSubmit,
 	ExportFormat,
@@ -88,6 +90,20 @@ export const api = {
 
 	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
 	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
+
+	/** 保存地址 / 模型 / 喂图方式（Key 不走这里）。 */
+	saveAISettings: (patch: AISettingsPatch) =>
+		fetch(`${BASE}/settings/ai`, {
+			method: "POST",
+			headers: JSON_HEADERS,
+			body: JSON.stringify(patch),
+		}).then(parse<AISettings>),
+
+	/** 用已保存的配置测试连接（失败写在结果的 error 里）。 */
+	testAI: () =>
+		fetch(`${BASE}/settings/ai/test`, { method: "POST" }).then(
+			parse<AITestResult>,
+		),
 
 	/** 默认提示词模板（只读）：建任务时展示/可编辑的底稿。 */
 	getPromptTemplate: () =>

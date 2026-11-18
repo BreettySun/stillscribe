@@ -8,6 +8,7 @@ import {
 	computed,
 	h,
 	onMounted,
+	ref,
 	onUnmounted,
 	watchEffect,
 	type Component,
@@ -18,18 +19,23 @@ import {
 	MoonOutline,
 	SunnyOutline,
 	GlobeOutline,
+	SettingsOutline,
 } from "@vicons/ionicons5";
 import type { CookieBrowser } from "@shared/types";
 import { useTasksStore } from "../stores/tasks";
 import { useEngineStore } from "../stores/engine";
 import { useSettingsStore, type ThemeMode } from "../stores/settings";
+import { useAIStore } from "../stores/ai";
 import { connectEvents } from "../api/events";
 import QueuePanel from "./queue/QueuePanel.vue";
 import ContextPane from "./ContextPane.vue";
+import AISettingsDialog from "./settings/AISettingsDialog.vue";
 
 const store = useTasksStore();
 const engine = useEngineStore();
 const settings = useSettingsStore();
+const ai = useAIStore();
+const showAISettings = ref(false);
 const vars = useThemeVars();
 
 let disconnect: (() => void) | undefined;
@@ -97,6 +103,7 @@ const BROWSER_OPTIONS: DropdownOption[] = BROWSERS.map((b) => ({
 onMounted(async () => {
 	// 初始 HTTP 拉取一次，之后由 SSE 增量更新。
 	void settings.load(); // 恢复持久化的 UI 偏好（主题 + cookie 浏览器）
+	void ai.load(); // 模型服务配置与就绪状态
 	await store.fetchAll().catch(() => engine.setStatus("disconnected"));
 	disconnect = connectEvents({
 		onEvent: (e) => store.applyEvent(e),
@@ -154,7 +161,19 @@ onUnmounted(() => disconnect?.());
 					</template>
 				</n-button>
 			</n-dropdown>
+			<n-button
+				quaternary
+				circle
+				size="small"
+				title="模型服务设置"
+				aria-label="模型服务设置"
+				@click="showAISettings = true">
+				<template #icon>
+					<n-icon :component="SettingsOutline" />
+				</template>
+			</n-button>
 		</header>
+		<AISettingsDialog v-model:show="showAISettings" />
 		<n-split
 			:default-size="'360px'"
 			:max="0.5"
