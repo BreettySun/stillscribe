@@ -325,8 +325,13 @@ ipcMain.handle("stillscribe:refresh-cookies", (_e, browser: unknown) =>
 	refreshCookies(typeof browser === "string" && browser ? browser : "chrome"),
 );
 
-/** 同步引擎失败时的提示：区分 Key 是否已落盘（不含 Key）。 */
-function syncFailMessage(persisted: boolean, reason: string): string {
+/** 同步引擎失败时的提示：区分保存 / 清除，以及磁盘上是否已改好（不含 Key）。 */
+function syncFailMessage(persisted: boolean, reason: string, clearing: boolean): string {
+	if (clearing) {
+		return persisted
+			? `${reason}；Key 已从磁盘删除，重启应用后生效`
+			: `${reason}；Key 未能从磁盘删除，重启应用后会恢复，请重试`;
+	}
 	return persisted
 		? `${reason}；Key 已保存，重启应用后生效`
 		: `${reason}；Key 未能保存且尚未生效，请重试`;
@@ -353,13 +358,15 @@ ipcMain.handle(
 				method: "PUT",
 				headers: { Authorization: engineAuthHeader, "Content-Type": "application/json" },
 				body: JSON.stringify({ baseUrl: norm.baseUrl, apiKey: key }),
+				// 对话框在请求期间不可关闭：引擎卡住时也要在有限时间内给出结果。
+				signal: AbortSignal.timeout(10_000),
 			});
 			status = r.status;
 		} catch {
-			throw new Error(syncFailMessage(persisted, "无法连接引擎"));
+			throw new Error(syncFailMessage(persisted, "无法连接引擎或引擎无响应", key === null));
 		}
 		if (status < 200 || status >= 300) {
-			throw new Error(syncFailMessage(persisted, `引擎拒绝更新 Key（HTTP ${status}）`));
+			throw new Error(syncFailMessage(persisted, `引擎拒绝更新 Key（HTTP ${status}）`, key === null));
 		}
 		return { persisted };
 	},

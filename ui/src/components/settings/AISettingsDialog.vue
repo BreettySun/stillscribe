@@ -116,6 +116,8 @@ function onShowUpdate(v: boolean): void {
 function onPresetChange(id: string): void {
 	preset.value = id;
 	touch();
+	// 地址跟着预设变了：已填未保存的 Key 是给原地址的，清掉，免得被存到新地址下。
+	apiKey.value = "";
 	const p = AI_PRESETS.find((x) => x.id === id);
 	if (p) {
 		baseUrl.value = p.baseUrl;
@@ -175,7 +177,7 @@ async function clearKey(): Promise<void> {
 	errorText.value = "";
 	try {
 		const r = await store.setKey(normalized.value.baseUrl, null);
-		if (!r.persisted) message.warning("Key 未能保存到系统钥匙串，重启后需重填");
+		if (!r.persisted) message.warning("Key 未能从磁盘删除，重启应用后会恢复");
 	} catch (e) {
 		errorText.value = errMsg(e);
 	} finally {
@@ -247,9 +249,11 @@ async function onSaveAndTest(): Promise<void> {
 		:mask-closable="busy === null"
 		:close-on-esc="busy === null"
 		@update:show="onShowUpdate">
+		<!-- 引擎设置没拿到之前整张表单不可编辑，免得用兜底值覆盖已保存的配置 -->
 		<n-form
 			label-placement="left"
 			label-width="84"
+			:disabled="store.settings === null"
 			@submit.prevent>
 			<n-form-item label="服务">
 				<n-select
@@ -274,7 +278,7 @@ async function onSaveAndTest(): Promise<void> {
 					@update:value="onKeyInput"
 					type="password"
 					autocomplete="off"
-					:disabled="!canStoreAIKey"
+					:disabled="!canStoreAIKey || store.settings === null"
 					:placeholder="keyPlaceholder" />
 				<n-text
 					depth="3"
