@@ -2,6 +2,7 @@
   "name": "@diggo/desktop",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "视频生成图文文章工具 — Electron 套壳（P3b）",
   "main": "out/main/index.js",
   "scripts": {

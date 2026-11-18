@@ -2,6 +2,11 @@
 	"name": "Diggo Press",
 	"version": "0.1.0",
 	"private": true,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/BreettySun/stillscribe.git"
+	},
 	"description": "YouTube 视频 → 图文文章 桌面应用（monorepo 根）",
 	"scripts": {
 		"dev": "concurrently -n engine,ui -c cyan,magenta \"pnpm dev:engine\" \"pnpm dev:ui\" \"pnpm dev:desktop\"",

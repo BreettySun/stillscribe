@@ -73,6 +73,12 @@ pnpm install
 pnpm --filter @diggo/engine setup-tools
 ```
 
+要用 Gemini 自动生成文章，再准备一份本地配置并填入你自己的 API Key（不填也能跑，文章环节会停下来等你手动回填）：
+
+```bash
+cp engine/.env.example engine/.env
+```
+
 ### 命令行跑通单条任务（P1）
 
 ```bash
@@ -134,3 +140,32 @@ pnpm dev
 ## 技术栈
 
 Electron 33 · Vue 3 + Vite 6 · naive-ui · Pinia · Fastify 5 · TypeScript 5 · `docx` · `sharp` · `better-sqlite3` · pnpm workspace。
+
+---
+
+## 适用范围与免责声明
+
+这个工具面向**你自己拥有版权、或已获得权利人授权的视频**，比如自家频道的内容、客户委托处理的素材。使用前请了解：
+
+- **平台条款**：下载 YouTube 视频可能违反 YouTube 的服务条款。是否可以下载、如何使用下载的内容，由使用者自行判断并承担责任。
+- **截图的版权**：导出的文章里嵌有视频截图。把他人视频的画面用于公开发布，尤其是商业或营销用途，通常需要权利人许可。本工具不替你判断某段素材能否使用。
+- **AI 生成内容**：文章由模型生成，人名、品牌、数字、事实都可能出错。发布前请人工核对，校对页就是为此准备的。
+- **登录态**：YouTube 要求登录验证时，工具会读取本机浏览器里的 YouTube cookie。cookie 只保存在本机工作目录，不会上传到任何地方；出站请求只发往 YouTube 和 Gemini。
+- **无关联声明**：本项目与 YouTube、Google 没有任何关联，也未获得其认可或背书。
+- **无担保**：软件按"现状"提供，不附带任何担保，详见 [LICENSE](LICENSE)。
+
+以上不构成法律意见。
+
+---
+
+## 参与贡献
+
+开发环境、提交规范和代码约束见 [CONTRIBUTING.md](CONTRIBUTING.md)。发现安全问题请按 [SECURITY.md](SECURITY.md) 私下报告，不要开公开 issue。
+
+---
+
+## 许可证
+
+本仓库的源码以 [MIT 许可证](LICENSE) 发布。
+
+随安装包分发的 ffmpeg / ffprobe 是 GPL 许可的第三方二进制，不在 MIT 范围内。自己打包并向他人分发安装包时需要履行 GPL 义务，说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

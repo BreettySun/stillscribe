@@ -2,6 +2,7 @@
   "name": "@diggo/engine",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "视频生成图文文章工具 — Node/TS 命令行引擎（P1）",
   "scripts": {

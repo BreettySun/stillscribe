@@ -2,6 +2,7 @@
   "name": "@diggo/ui",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "视频生成图文文章工具 — Vue 3 渲染进程（P3a 纯 Web）",
   "scripts": {
