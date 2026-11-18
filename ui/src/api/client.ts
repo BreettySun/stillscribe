@@ -88,7 +88,7 @@ export const api = {
 			body: JSON.stringify(patch),
 		}).then(parse<UISettings>),
 
-	/** AI 全自动状态（只读）：hasApiKey + model + imageSource。model/Key 由引擎侧 engine/.env 配置。 */
+	/** 模型服务设置：地址 / 模型 / 喂图方式 + Key 状态（hasApiKey / keySource / keySources / ready），绝不含 Key 明文。 */
 	getAISettings: () => fetch(`${BASE}/settings/ai`).then(parse<AISettings>),
 
 	/** 保存地址 / 模型 / 喂图方式（Key 不走这里）。 */

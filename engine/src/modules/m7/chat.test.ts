@@ -249,6 +249,17 @@ describe("chat 客户端", () => {
       );
       expect(err.message).not.toContain("sk-test");
     }
+    // 400 + 鉴权提示（走 config 分支，信息里带服务端原文）且服务端回显了 Key
+    const authEcho = await startFake(() => ({
+      status: 400,
+      json: [{ error: { message: "API key not valid: sk-test. Please pass a valid API key." } }],
+    }));
+    const err = await catchErr(
+      chatJson({ baseUrl: authEcho.baseUrl, apiKey: "sk-test", model: "m" }, { parts: PARTS, schema: SCHEMA }),
+    );
+    expect(err.kind).toBe("config");
+    expect(err.message).toContain("API key not valid");
+    expect(err.message).not.toContain("sk-test");
   });
 
   it.each([301, 302, 307, 308])("HTTP %i 重定向 → config，不跟随、不把请求体发往新地址", async (status) => {

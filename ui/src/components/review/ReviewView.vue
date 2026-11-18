@@ -117,8 +117,8 @@ async function onExport(): Promise<void> {
 			type="warning"
 			title="自动生成失败，已转为人工回填"
 			:closable="false">
-			{{ task.autoError }}
-			可以在下方手动回填，或到设置里检查模型配置。
+			<div>{{ task.autoError }}</div>
+			<div>可以在下方手动回填，或到设置里检查模型配置。</div>
 		</n-alert>
 
 		<!-- 已有 article：逐页校对 + 换图 -->
