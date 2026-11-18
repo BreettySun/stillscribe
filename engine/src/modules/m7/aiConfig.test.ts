@@ -16,7 +16,7 @@ describe("AIConfig", () => {
 			hasApiKey: false,
 			keySource: "none",
 			ready: false,
-			keyedBaseUrls: [],
+			keySources: {},
 		});
 	});
 
@@ -36,7 +36,7 @@ describe("AIConfig", () => {
 		expect(s.hasApiKey).toBe(true);
 		expect(s.keySource).toBe("env");
 		expect(s.ready).toBe(true);
-		expect(s.keyedBaseUrls).toEqual([AI_DEFAULTS.baseUrl]);
+		expect(s.keySources).toEqual({ [AI_DEFAULTS.baseUrl]: "env" });
 		// 新名优先于旧名
 		const c2 = new AIConfig({ STILLSCRIBE_AI_MODEL: "new-m", STILLSCRIBE_GEMINI_MODEL: "old-m" }, mem());
 		expect(c2.read().model).toBe("new-m");
@@ -46,30 +46,30 @@ describe("AIConfig", () => {
 		const c = new AIConfig({ STILLSCRIBE_AI_BASE_URL: A, STILLSCRIBE_AI_API_KEY: "k" }, mem());
 		expect(c.resolve().baseUrl).toBe(A);
 		expect(c.resolve().apiKey).toBe("k");
-		expect(c.read().keyedBaseUrls).toEqual([A]);
+		expect(c.read().keySources).toEqual({ [A]: "env" });
 		c.save({ baseUrl: B });
 		expect(c.resolve().apiKey).toBeUndefined();
 		// 未设 BASE_URL 时属于默认地址
 		const d = new AIConfig({ STILLSCRIBE_AI_API_KEY: "k" }, mem());
-		expect(d.read().keyedBaseUrls).toEqual([AI_DEFAULTS.baseUrl]);
+		expect(d.read().keySources).toEqual({ [AI_DEFAULTS.baseUrl]: "env" });
 	});
 
 	it("环境地址非法时丢弃单 Key，不绑定到默认地址", () => {
 		const c = new AIConfig({ STILLSCRIBE_AI_BASE_URL: "http://my-proxy.example/v1", STILLSCRIBE_AI_API_KEY: "k" }, mem());
 		expect(c.resolve().apiKey).toBeUndefined();
 		expect(c.read().hasApiKey).toBe(false);
-		expect(c.read().keyedBaseUrls).toEqual([]);
+		expect(c.read().keySources).toEqual({});
 	});
 
 	it("环境地址为空白时，单 Key 属于默认地址", () => {
 		const c = new AIConfig({ STILLSCRIBE_AI_BASE_URL: "   ", STILLSCRIBE_AI_API_KEY: "k" }, mem());
 		expect(c.resolve().apiKey).toBe("k");
-		expect(c.read().keyedBaseUrls).toEqual([AI_DEFAULTS.baseUrl]);
+		expect(c.read().keySources).toEqual({ [AI_DEFAULTS.baseUrl]: "env" });
 	});
 
 	it("STILLSCRIBE_AI_KEYS 非法 JSON → 视为空表，不抛错", () => {
 		const c = new AIConfig({ STILLSCRIBE_AI_KEYS: "{not json" }, mem());
-		expect(c.read().keyedBaseUrls).toEqual([]);
+		expect(c.read().keySources).toEqual({});
 		expect(c.read().hasApiKey).toBe(false);
 	});
 
@@ -101,6 +101,25 @@ describe("AIConfig", () => {
 		expect(c.resolve().keySource).toBe("env");
 	});
 
+	it("keySources 按地址给出来源：表 → saved，仅环境变量 → env，两处都有 → saved", () => {
+		const c = new AIConfig(
+			{
+				STILLSCRIBE_AI_KEYS: JSON.stringify({ [A]: "ta" }),
+				STILLSCRIBE_AI_BASE_URL: B,
+				STILLSCRIBE_AI_API_KEY: "eb",
+				STILLSCRIBE_GEMINI_API_KEY: "eg",
+			},
+			mem(),
+		);
+		// 当前地址是 B（env）；非当前地址也各自给出来源
+		expect(c.read().keySources).toEqual({ [A]: "saved", [B]: "env", [AI_DEFAULTS.baseUrl]: "env" });
+		c.setKey({ baseUrl: B, apiKey: "sb" });
+		expect(c.read().keySources).toEqual({ [A]: "saved", [B]: "saved", [AI_DEFAULTS.baseUrl]: "env" });
+		c.setKey({ baseUrl: B, apiKey: null });
+		expect(c.read().keySources[B]).toBe("env");
+		expect(JSON.stringify(c.read())).not.toMatch(/"(ta|eb|eg|sb)"/);
+	});
+
 	it("回环地址没有 Key 也算就绪", () => {
 		const c = new AIConfig({}, mem());
 		c.save({ baseUrl: "http://localhost:11434/v1" });
@@ -123,7 +142,7 @@ describe("AIConfig", () => {
 	it("setKey 对地址做规范化，非法地址抛 AIConfigError", () => {
 		const c = new AIConfig({}, mem());
 		c.setKey({ baseUrl: "https://a.com/v1/", apiKey: "k" });
-		expect(c.read().keyedBaseUrls).toEqual([A]);
+		expect(c.read().keySources).toEqual({ [A]: "saved" });
 		expect(() => c.setKey({ baseUrl: "http://a.com/v1", apiKey: "k" })).toThrow(AIConfigError);
 	});
 

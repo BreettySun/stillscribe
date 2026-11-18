@@ -136,14 +136,12 @@ const canSubmit = computed(
 		busy.value === null,
 );
 
-/** Key 状态按表单里当前填的地址判断。 */
+/** Key 状态按表单里当前填的地址（规范化后）判断，不论它是不是已保存的当前地址。 */
 const keyStatus = computed<"env" | "saved" | "none">(() => {
 	const s = store.settings;
 	const n = normalized.value;
 	if (!s || !n.ok) return "none";
-	if (n.baseUrl === s.baseUrl && s.keySource === "env") return "env";
-	if (s.keyedBaseUrls.includes(n.baseUrl)) return "saved";
-	return "none";
+	return s.keySources[n.baseUrl] ?? "none";
 });
 
 const keyPlaceholder = computed(() =>
@@ -278,11 +276,15 @@ async function onSaveAndTest(): Promise<void> {
 					autocomplete="off"
 					:disabled="!canStoreAIKey"
 					:placeholder="keyPlaceholder" />
-				<span class="key-status">
+				<n-text
+					depth="3"
+					class="key-status">
 					<template v-if="keyStatus === 'env'">来自 engine/.env</template>
 					<template v-else-if="keyStatus === 'saved'">
 						已保存
+						<!-- 只有表里的 Key 能清除；纯 Web 模式没有主进程可写，不给按钮 -->
 						<n-button
+							v-if="canStoreAIKey"
 							text
 							type="primary"
 							size="small"
@@ -293,7 +295,7 @@ async function onSaveAndTest(): Promise<void> {
 						</n-button>
 					</template>
 					<template v-else>未设置</template>
-				</span>
+				</n-text>
 			</n-form-item>
 			<n-form-item
 				label="模型"
@@ -362,7 +364,6 @@ async function onSaveAndTest(): Promise<void> {
 	margin-left: 10px;
 	white-space: nowrap;
 	font-size: 12px;
-	color: var(--c-muted, #888);
 }
 .result-warn {
 	margin-top: 8px;

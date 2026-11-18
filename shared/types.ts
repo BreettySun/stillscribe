@@ -250,7 +250,7 @@ export interface Task {
 //  POST /tasks/:id/cancel                                     -> Task
 //
 //  --- 模型服务设置（M7；任何响应都绝不含 Key 明文）---
-//  GET  /settings/ai                                          -> AISettings        (baseUrl/model/imageSource + hasApiKey/keySource/ready/keyedBaseUrls)
+//  GET  /settings/ai                                          -> AISettings        (baseUrl/model/imageSource + hasApiKey/keySource/ready/keySources)
 //  POST /settings/ai         body: AISettingsPatch            -> AISettings        (保存地址/模型/喂图策略；地址会规范化；非法值 -> 400)
 //  PUT  /settings/ai/key     body: AIKeyUpdate                -> AISettings        (只写：写入/清除某地址的 Key，apiKey=null 为清除；
 //                                                                                   Key 不会被任何路由返回；非法地址或 body 形状 -> 400)
@@ -348,8 +348,11 @@ export interface AISettings {
 	keySource: AIKeySource;
 	/** 是否可发起请求：有 Key，或当前地址是回环地址（本机服务可不要 Key）。 */
 	ready: boolean;
-	/** 所有已有 Key 的地址（含来自环境变量的）。 */
-	keyedBaseUrls: string[];
+	/**
+	 * 每个已有 Key 的地址（规范化后）→ 其 Key 的来源：表里存的为 "saved"，只来自环境变量的为 "env"；
+	 * 两处都有时为 "saved"（与取 Key 的优先级一致）。没有 Key 的地址不出现。地址本身不是机密。
+	 */
+	keySources: Record<string, "saved" | "env">;
 }
 
 export const AI_DEFAULTS: Pick<AISettings, "baseUrl" | "model" | "imageSource"> = {

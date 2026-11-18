@@ -1,6 +1,6 @@
 /**
  * 模型服务设置（Pinia）：地址 / 模型 / 喂图方式 / Key 状态，均由引擎持有。
- * 渲染进程不持有 Key：Key 只经 bridge.setAIKey 写入主进程，界面只看到 hasApiKey / keyedBaseUrls。
+ * 渲染进程不持有 Key：Key 只经 bridge.setAIKey 写入主进程，界面只看到 hasApiKey / keySources。
  * 状态都在内存里，不用 localStorage（CLAUDE.md 铁律 #9）。
  */
 import { defineStore } from "pinia";

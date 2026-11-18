@@ -151,6 +151,10 @@ export class AIConfig {
 	/** 给渲染进程的视图：只说"有没有 Key、来自哪"，绝不含明文。 */
 	read(): AISettings {
 		const c = this.resolve();
+		// 先填 env 再用表覆盖：同一地址两处都有时为 saved，与 keyFor 的优先级一致。
+		const keySources: AISettings["keySources"] = {};
+		for (const url of Object.keys(this.envKeys)) keySources[url] = "env";
+		for (const url of Object.keys(this.table)) keySources[url] = "saved";
 		return {
 			baseUrl: c.baseUrl,
 			model: c.model,
@@ -158,7 +162,7 @@ export class AIConfig {
 			hasApiKey: Boolean(c.apiKey),
 			keySource: c.keySource,
 			ready: c.ready,
-			keyedBaseUrls: [...new Set([...Object.keys(this.table), ...Object.keys(this.envKeys)])],
+			keySources,
 		};
 	}
 
