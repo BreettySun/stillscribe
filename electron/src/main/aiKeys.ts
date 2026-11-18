@@ -8,7 +8,7 @@
  * 任何 Key 或解密内容都不得写入 stdout/stderr（含错误路径）。须在 app ready 之后调用（safeStorage 依赖之）。
  * 开发态与打包后行为一致。
  */
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { app, safeStorage } from "electron";
 import { mergeLegacyKey, parseKeyTable, type AIKeyTable } from "@shared/ai";
@@ -47,17 +47,54 @@ function readLegacyKey(canDecrypt: boolean): { key: string | undefined; encKept:
 	return { key, encKept };
 }
 
-/** 加密写盘；safeStorage 不可用时不写任何文件。返回是否已落盘。 */
+/** 本次会话中 ai-keys.enc 存在但解密失败（可能是钥匙串授权被拒等暂时性原因）：不在加载时动它，首次写入前改名保留。 */
+let encUnreadable = false;
+
+/** 加密原子写盘（临时文件 + rename）；safeStorage 不可用时不写任何文件。返回是否已落盘。绝不抛出。 */
 export function saveKeyTable(table: AIKeyTable): boolean {
-	if (!safeStorage.isEncryptionAvailable()) return false;
+	let tmp: string | undefined;
 	try {
+		if (!safeStorage.isEncryptionAvailable()) return false;
 		const file = encPath();
-		writeFileSync(file, safeStorage.encryptString(JSON.stringify(table)), { mode: 0o600 });
-		chmodSync(file, 0o600); // mode 只在新建时生效，已存在的文件也要收紧
+		const bytes = safeStorage.encryptString(JSON.stringify(table));
+
+		// 旧文件解密失败过：先改名保留（它可能是用户唯一的副本），改名失败则不写。
+		if (encUnreadable && existsSync(file)) {
+			try {
+				renameSync(file, `${file}.unreadable-${Date.now()}`);
+			} catch {
+				console.error("[aiKeys] 无法保留无法解密的 ai-keys.enc，放弃写入。");
+				return false;
+			}
+		}
+		encUnreadable = false;
+
+		tmp = `${file}.tmp-${process.pid}`;
+		writeFileSync(tmp, bytes, { mode: 0o600 });
+		chmodSync(tmp, 0o600); // mode 只在新建时生效，临时文件若已残留也要收紧
+		renameSync(tmp, file);
+		tmp = undefined;
 		return true;
 	} catch {
 		console.error("[aiKeys] 写入 ai-keys.enc 失败。");
 		return false;
+	} finally {
+		if (tmp) {
+			try {
+				rmSync(tmp, { force: true });
+			} catch {
+				/* 临时文件清理失败无碍 */
+			}
+		}
+	}
+}
+
+/** 删除旧文件；失败只记固定一行，不抛出（否则会阻断应用启动）。 */
+function removeLegacy(file: string): void {
+	try {
+		rmSync(file, { force: true });
+	} catch {
+		console.error("[aiKeys] 清理旧 gemini-key 文件失败，已忽略。");
 	}
 }
 
@@ -68,16 +105,30 @@ export function saveKeyTable(table: AIKeyTable): boolean {
  * 无法解密的旧 gemini-key.enc 永远保留。
  */
 export function loadKeyTable(): AIKeyTable {
-	const canDecrypt = safeStorage.isEncryptionAvailable();
+	let canDecrypt = false;
+	try {
+		canDecrypt = safeStorage.isEncryptionAvailable();
+	} catch {
+		/* 视为不可用 */
+	}
 	let table: AIKeyTable = {};
 	let loadedFromDisk = false;
 
 	if (canDecrypt && existsSync(encPath())) {
 		try {
-			table = parseKeyTable(safeStorage.decryptString(readFileSync(encPath())));
-			loadedFromDisk = true;
+			const text = safeStorage.decryptString(readFileSync(encPath()));
+			table = parseKeyTable(text);
+			// 解出来却不是合法表（parseKeyTable 对非法输入返回 {}）：同样视为不可读，别用空表覆盖。
+			if (Object.keys(table).length === 0 && text.trim() !== "{}") {
+				table = {};
+				encUnreadable = true;
+				console.error("[aiKeys] ai-keys.enc 内容无法解析，按空表处理并在改写前保留原文件。");
+			} else {
+				loadedFromDisk = true;
+			}
 		} catch {
-			console.error("[aiKeys] 解密 ai-keys.enc 失败，按空表处理。");
+			encUnreadable = true;
+			console.error("[aiKeys] 解密 ai-keys.enc 失败，按空表处理（原文件保留，改写前会改名备份）。");
 		}
 	}
 
@@ -89,8 +140,8 @@ export function loadKeyTable(): AIKeyTable {
 		onDisk = saveKeyTable(table);
 	}
 	if (onDisk) {
-		if (!legacy.encKept) rmSync(legacyEncPath(), { force: true });
-		rmSync(legacyTxtPath(), { force: true });
+		if (!legacy.encKept) removeLegacy(legacyEncPath());
+		removeLegacy(legacyTxtPath());
 	}
 	return table;
 }

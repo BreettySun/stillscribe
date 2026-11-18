@@ -315,6 +315,13 @@ ipcMain.handle("stillscribe:refresh-cookies", (_e, browser: unknown) =>
 	refreshCookies(typeof browser === "string" && browser ? browser : "chrome"),
 );
 
+/** 同步引擎失败时的提示：区分 Key 是否已落盘（不含 Key）。 */
+function syncFailMessage(persisted: boolean, reason: string): string {
+	return persisted
+		? `${reason}；Key 已保存，重启应用后生效`
+		: `${reason}；Key 未能保存且尚未生效，请重试`;
+}
+
 // 保存/清除某个模型服务地址的 Key：更新内存表 → 加密落盘 → 同步给运行中的引擎。Key 不写日志、不进错误信息。
 ipcMain.handle(
 	"stillscribe:set-ai-key",
@@ -339,10 +346,10 @@ ipcMain.handle(
 			});
 			status = r.status;
 		} catch {
-			throw new Error("无法连接引擎，Key 已保存，重启后生效");
+			throw new Error(syncFailMessage(persisted, "无法连接引擎"));
 		}
 		if (status < 200 || status >= 300) {
-			throw new Error(`引擎拒绝更新 Key（HTTP ${status}），重启后生效`);
+			throw new Error(syncFailMessage(persisted, `引擎拒绝更新 Key（HTTP ${status}）`));
 		}
 		return { persisted };
 	},
