@@ -119,13 +119,13 @@ describe("planKeyLoad", () => {
 		expect(plan({ keyFile: "unreadable" })).toEqual({ table: {}, ...nothing, markKeyFileUnreadable: true });
 	});
 
-	it("加密不可用时已有 ai-keys.enc（未读）：不保存、不删；不标记不可读", () => {
+	it("加密不可用时已有 ai-keys.enc（未能读取）：不保存、不删，并标记不可读——以后保存先改名保留，不直接覆盖", () => {
 		expect(plan({ encryptionAvailable: false, keyFile: "unreadable", legacyTxt: { key: "old" } })).toEqual({
 			table: { [D]: "old" },
 			save: false,
 			deleteIfSaved: [],
 			deleteNow: [],
-			markKeyFileUnreadable: false,
+			markKeyFileUnreadable: true,
 		});
 	});
 });

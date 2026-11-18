@@ -132,8 +132,8 @@ export function planKeyLoad(input: KeyLoadInput): KeyLoadPlan {
 		save,
 		deleteIfSaved: save ? deletable : [],
 		deleteNow: !changed && loadedFromDisk ? deletable : [],
-		// 加载时加密不可用的 ai-keys.enc 根本没读过，不标记（沿用现状）。
-		markKeyFileUnreadable: keyFile === "unreadable" && encryptionAvailable,
+		// 只要文件在却没读出来（含加载时加密不可用而根本没读）就标记，之后写入前改名保留，绝不覆盖。
+		markKeyFileUnreadable: keyFile === "unreadable",
 	};
 }
 
