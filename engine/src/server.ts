@@ -16,6 +16,7 @@ import {
 	type AIKeyUpdate,
 	type AISettings,
 	type AISettingsPatch,
+	type AITestResult,
 	type BatchSubmit,
 	type CookieBrowser,
 	type ExportFormat,
@@ -37,6 +38,7 @@ import { loadManifest } from "./modules/m5-select.ts";
 import { refreshCookies } from "./modules/cookies-refresh.ts";
 import { validateArticle } from "./validate.ts";
 import { AIConfigError, type AIConfig } from "./modules/m7/aiConfig.ts";
+import { testConnection } from "./modules/m7/testConnection.ts";
 import { loadPromptTemplate } from "./modules/m7/prompt.ts";
 import type { TaskStore } from "./store/tasks.ts";
 import type { SettingsStore } from "./store/settings.ts";
@@ -347,7 +349,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 	});
 
 	// ---- 模型服务设置（M7）。三条路由：GET 读取、POST 保存地址/模型/喂图策略、
-	//       PUT /settings/ai/key 写入或清除某地址的 Key（只写：任何响应都不含 Key，铁律 #6）。
+	//       PUT /settings/ai/key 写入或清除某地址的 Key（只写：任何响应都不含 Key，铁律 #6）；
+	//       POST /settings/ai/test 用当前已保存配置测试连接（无 body），并记住探测到的结构化级别。
 	//       body 形状先在此校验，值的合法性（地址规范化等）由 AIConfig 判定，错误一律 400 ----
 	app.get("/settings/ai", () => ai.read());
 
@@ -380,6 +383,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 		} catch (e) {
 			throw asHttpError(e);
 		}
+	});
+
+	app.post("/settings/ai/test", async (): Promise<AITestResult> => {
+		const cfg = ai.resolve();
+		const result = await testConnection(cfg);
+		if (result.structuredMode !== null) ai.rememberStructuredMode(cfg.baseUrl, cfg.model, result.structuredMode);
+		return result;
 	});
 
 	// ---- 默认提示词模板（只读）：供建任务时展示/编辑；含 {{videoTitle}}/{{imageCount}} 占位 ----

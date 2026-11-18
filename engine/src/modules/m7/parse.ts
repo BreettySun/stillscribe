@@ -8,17 +8,19 @@
 import type { Article } from "@shared/types";
 import { validateArticle } from "../../validate.ts";
 
+/** 把模型文本解析成 JSON；偶发包在 ```json``` 代码块里，剥一层再试。无法解析时抛错。 */
+export function parseModelJson(trimmed: string): unknown {
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
+    if (!fenced) throw new Error("模型返回非 JSON，无法解析");
+    return JSON.parse(fenced[1]!.trim());
+  }
+}
+
 export function parseAndValidateArticle(text: string): Article {
   const trimmed = (text ?? "").trim();
   if (!trimmed) throw new Error("模型返回空响应");
-  let json: unknown;
-  try {
-    json = JSON.parse(trimmed);
-  } catch {
-    // 偶发把 JSON 包在 ```json``` 代码块里——剥一层再试。
-    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
-    if (!fenced) throw new Error("模型返回非 JSON，无法解析");
-    json = JSON.parse(fenced[1]!.trim());
-  }
-  return validateArticle(json); // 形状不合抛错 → 上层重试/降级
+  return validateArticle(parseModelJson(trimmed)); // 形状不合抛错 → 上层重试/降级
 }

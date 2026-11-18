@@ -1,15 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
-import { AI_DEFAULTS, type AISettings } from "@shared/types";
+import { AI_DEFAULTS, type AISettings, type AITestResult } from "@shared/types";
 import { buildServer } from "./server.ts";
 import { AIConfig } from "./modules/m7/aiConfig.ts";
 import { TaskStore } from "./store/tasks.ts";
 import { SettingsStore } from "./store/settings.ts";
 import { EventBus } from "./orchestrator/events.ts";
 import { Orchestrator } from "./orchestrator/queue.ts";
+import { startFake, closeAllFakes, ok } from "./modules/m7/testFake.ts";
 
 let app: FastifyInstance | undefined;
+
+let lastAI: AIConfig | undefined;
 
 function makeApp(): FastifyInstance {
 	const store = new TaskStore(":memory:");
@@ -21,7 +24,7 @@ function makeApp(): FastifyInstance {
 		orchestrator: new Orchestrator(store, bus, { workRoot: tmpdir() }),
 		settings,
 		workRoot: tmpdir(),
-		ai: new AIConfig({}, settings),
+		ai: (lastAI = new AIConfig({}, settings)),
 		auth: { token: "t", allowedOrigins: [] },
 	});
 	return app;
@@ -38,6 +41,7 @@ function call(
 }
 
 afterEach(async () => {
+	await closeAllFakes();
 	await app?.close();
 	app = undefined;
 });
@@ -135,5 +139,27 @@ describe("模型服务设置路由", () => {
 		});
 		expect(res.statusCode).toBe(400);
 		expect(res.body).not.toContain("sk-secret");
+	});
+
+	it("POST /settings/ai/test 不带令牌 → 401", async () => {
+		const res = await call(makeApp(), "POST", "/settings/ai/test", undefined, {});
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("POST /settings/ai/test 返回 AITestResult 并记住结构化级别", async () => {
+		const fake = await startFake((req) => {
+			if (!req.body.response_format) return ok("ok");
+			return req.body.response_format.type === "json_schema"
+				? { status: 400, json: { error: { message: "response_format not supported" } } }
+				: ok('{"color":"red"}');
+		});
+		const a = makeApp();
+		const saved = await call(a, "POST", "/settings/ai", { baseUrl: fake.baseUrl });
+		expect(saved.statusCode).toBe(200);
+		const res = await call(a, "POST", "/settings/ai/test");
+		expect(res.statusCode).toBe(200);
+		const body = res.json() as AITestResult;
+		expect(body).toMatchObject({ ok: true, seesImage: true, structuredMode: "json_object" });
+		expect(lastAI!.resolve().structuredMode).toBe("json_object");
 	});
 });

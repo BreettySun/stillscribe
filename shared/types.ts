@@ -257,6 +257,8 @@ export interface Task {
 //  POST /settings/ai         body: AISettingsPatch            -> AISettings        (保存地址/模型/喂图策略；地址会规范化；非法值 -> 400)
 //  PUT  /settings/ai/key     body: AIKeyUpdate                -> AISettings        (只写：写入/清除某地址的 Key，apiKey=null 为清除；
 //                                                                                   Key 不会被任何路由返回；非法地址或 body 形状 -> 400)
+//  POST /settings/ai/test    (无 body)                        -> AITestResult      (用当前已保存的配置两步测试：连通性 + 看图/结构化级别；
+//                                                                                   失败写进 error 而非 HTTP 错误；探测到的级别会被记住)
 //
 //  --- 静态资源（给浏览器看图；引擎按任务 workDir 内取，含路径穿越防护）---
 //  GET  /static/:id/grids/:file   -> image/jpeg   宫格图字节（03_grids/<file>）
