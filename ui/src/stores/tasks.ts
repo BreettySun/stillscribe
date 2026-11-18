@@ -80,6 +80,8 @@ export const useTasksStore = defineStore("tasks", () => {
 				break;
 			case "status_changed":
 				patch(e.taskId, { status: e.status });
+				// autoError 不随事件下发：转入校对态时拉一次完整快照，才能显示"自动生成失败"原因。
+				if (e.status === "awaiting_review") void refresh(e.taskId).catch(() => {});
 				break;
 			case "info":
 				patch(e.taskId, { videoTitle: e.videoTitle, workDir: e.workDir });
@@ -90,6 +92,7 @@ export const useTasksStore = defineStore("tasks", () => {
 				break;
 			case "awaiting_review":
 				patch(e.taskId, { status: "awaiting_review", article: e.article });
+				void refresh(e.taskId).catch(() => {});
 				break;
 			case "completed":
 				patch(e.taskId, { status: "completed", outputs: e.outputs });

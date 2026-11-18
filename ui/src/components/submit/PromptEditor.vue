@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 提示词编辑器：默认折叠。展开后可改本次提交所用的 Gemini 提示词。
+/** 提示词编辑器：默认折叠。展开后可改本次提交所用的 模型提示词。
  * 修改仅对本批提交生效，不回写引擎默认模板（CLAUDE.md §8）。
  * {{videoTitle}}/{{imageCount}} 为占位，生成时由引擎自动填充。 */
 import { computed } from "vue";

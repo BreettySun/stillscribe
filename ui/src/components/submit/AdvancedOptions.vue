@@ -13,20 +13,20 @@ export interface AdvancedModel {
 
 const model = defineModel<AdvancedModel>({ required: true });
 
-const props = withDefaults(defineProps<{ aiHasKey?: boolean }>(), {
-	aiHasKey: false,
+const props = withDefaults(defineProps<{ aiReady?: boolean }>(), {
+	aiReady: false,
 });
 
 const qualityOptions = [
 	{ label: "1080p", value: 1080 },
 	{ label: "1440p", value: 1440 },
 ];
-// auto 需引擎侧配好 Gemini Key（engine/.env）才可选；未配置时禁用并提示。
+// auto 需先在设置中配好模型服务（地址 + Key）才可选；未配置时禁用并提示。
 const modeOptions = computed(() => [
 	{
 		label: "Auto（全自动）",
 		value: "auto",
-		disabled: !props.aiHasKey,
+		disabled: !props.aiReady,
 	},
 	{ label: "Semi（半自动回填）", value: "semi" },
 ]);
@@ -80,6 +80,11 @@ const summaryTags = computed(() => {
 						<n-select
 							v-model:value="model.mode"
 							:options="modeOptions" />
+						<span
+							v-if="!aiReady"
+							class="mode-hint">
+							请先在设置中配置模型服务
+						</span>
 					</n-form-item-gi>
 					<n-form-item-gi
 						label="相近帧去重"
@@ -103,6 +108,11 @@ const summaryTags = computed(() => {
 </template>
 
 <style scoped>
+.mode-hint {
+	margin-left: 8px;
+	font-size: 12px;
+	color: var(--c-muted);
+}
 .adv-header {
 	font-size: 13px;
 }

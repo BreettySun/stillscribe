@@ -100,7 +100,7 @@ async function onExport(): Promise<void> {
 				<p
 					class="hint"
 					v-else>
-					等待回填文章：宫格图 + 字幕交给 Gemini，按 Article 契约生成 JSON
+					等待回填文章：宫格图 + 字幕交给模型，按 Article 契约生成 JSON
 				</p>
 			</div>
 			<n-button
@@ -111,6 +111,15 @@ async function onExport(): Promise<void> {
 				✓ 确认并导出
 			</n-button>
 		</div>
+
+		<n-alert
+			v-if="!hasArticle && task.autoError"
+			type="warning"
+			title="自动生成失败，已转为人工回填"
+			:closable="false">
+			{{ task.autoError }}
+			可以在下方手动回填，或到设置里检查模型配置。
+		</n-alert>
 
 		<!-- 已有 article：逐页校对 + 换图 -->
 		<template v-if="hasArticle">

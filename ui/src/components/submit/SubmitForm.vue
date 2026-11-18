@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /** 新建任务态（无选中）：URL 主输入 + 折叠的高级选项 + 提交 CTA。 */
-import { computed, reactive, ref, onMounted } from "vue";
+import { computed, reactive, ref, onMounted, watch } from "vue";
 import { useMessage } from "naive-ui";
 import { DEFAULTS, type TaskParams } from "@shared/types";
 import { api } from "../../api/client";
+import { useAIStore } from "../../stores/ai";
 import { useTasksStore } from "../../stores/tasks";
 import { useSettingsStore } from "../../stores/settings";
 import AdvancedOptions, { type AdvancedModel } from "./AdvancedOptions.vue";
@@ -11,6 +12,7 @@ import PromptEditor from "./PromptEditor.vue";
 
 const store = useTasksStore();
 const settings = useSettingsStore();
+const ai = useAIStore();
 const message = useMessage();
 
 const urlsText = ref("");
@@ -20,14 +22,8 @@ const busy = ref(false);
 const defaultPrompt = ref("");
 const promptText = ref("");
 
-// 全自动(auto)是否就绪：引擎侧 engine/.env 是否配了 Gemini Key。仅决定 auto 选项是否可选。
-const aiHasKey = ref(false);
+// 全自动(auto)是否就绪由模型服务设置 store 提供（保存设置后即时响应，无需刷新）。
 onMounted(async () => {
-	try {
-		aiHasKey.value = (await api.getAISettings()).ready;
-	} catch {
-		/* 引擎未就绪/旧版无此端点 → 视为未配置，auto 不可选 */
-	}
 	try {
 		defaultPrompt.value = (await api.getPromptTemplate()).template;
 		promptText.value = defaultPrompt.value;
@@ -42,6 +38,23 @@ let adv = reactive<AdvancedModel>({
 	dedup: DEFAULTS.dedup,
 	threshold: DEFAULTS.dedupThreshold,
 });
+
+// 模型服务未就绪时 auto 不可选：已选中的 auto 自动改为 semi，避免静默提交跑不了的全自动任务；
+// 就绪后若是我们改的，再恢复为 auto。
+let downgradedFromAuto = false;
+watch(
+	() => ai.ready,
+	(ready) => {
+		if (!ready && adv.mode === "auto") {
+			adv.mode = "semi";
+			downgradedFromAuto = true;
+		} else if (ready && downgradedFromAuto) {
+			adv.mode = "auto";
+			downgradedFromAuto = false;
+		}
+	},
+	{ immediate: true },
+);
 
 const urls = computed(() =>
 	urlsText.value
@@ -118,7 +131,7 @@ async function onSubmit(): Promise<void> {
 
 		<AdvancedOptions
 			v-model="adv"
-			:ai-has-key="aiHasKey" />
+			:ai-ready="ai.ready" />
 	</n-space>
 </template>
 
