@@ -94,6 +94,8 @@ async function requestOnce(
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      // 不跟随重定向：307/308 会把请求体（字幕、帧）连同 Key 重发到用户没配置过的地址，甚至降级到 http（铁律 #6）。
+      redirect: "manual",
       signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });
     status = res.status;
@@ -104,6 +106,10 @@ async function requestOnce(
   }
 
   if (status >= 200 && status < 300) return parseSuccess(text, status);
+  if (status >= 300 && status < 400) {
+    // 不回显 Location：它可能带 query 等细节；用户按服务文档填最终地址即可。
+    throw new AIRequestError("config", `地址发生了重定向，请填写最终地址（HTTP ${status}）`, status);
+  }
 
   const serverMsg = redact(extractServerMessage(text), apiKey);
   if (status === 401 || status === 403) {

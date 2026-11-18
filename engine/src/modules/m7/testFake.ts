@@ -11,6 +11,8 @@ export interface FakeReply {
   status: number;
   json?: unknown;
   text?: string;
+  /** 额外响应头（如重定向的 Location）。 */
+  headers?: Record<string, string>;
 }
 export type Handler = (req: Recorded, index: number) => FakeReply | "hang";
 
@@ -32,7 +34,10 @@ export async function startFake(handler: Handler) {
       const reply = handler(rec, requests.length - 1);
       if (reply === "hang") return;
       const payload = reply.text ?? JSON.stringify(reply.json ?? {});
-      res.writeHead(reply.status, { "content-type": reply.text !== undefined ? "text/html" : "application/json" });
+      res.writeHead(reply.status, {
+        "content-type": reply.text !== undefined ? "text/html" : "application/json",
+        ...reply.headers,
+      });
       res.end(payload);
     });
   });

@@ -211,6 +211,24 @@ describe("chat 客户端", () => {
     }
   });
 
+  it.each([301, 302, 307, 308])("HTTP %i 重定向 → config，不跟随、不把请求体发往新地址", async (status) => {
+    const second = await startFake(() => ok("{}"));
+    const first = await startFake(() => ({
+      status,
+      json: {},
+      headers: { location: `${second.baseUrl}/chat/completions` },
+    }));
+    const err = await catchErr(
+      chatJson({ baseUrl: first.baseUrl, apiKey: "sk-test", model: "m" }, { parts: PARTS, schema: SCHEMA }),
+    );
+    expect(err.kind).toBe("config");
+    expect(err.status).toBe(status);
+    expect(err.message).toContain("地址发生了重定向，请填写最终地址");
+    expect(err.message).not.toContain("sk-test");
+    expect(first.requests).toHaveLength(1);
+    expect(second.requests).toHaveLength(0);
+  });
+
   it("chatText 不带 response_format 并返回文本", async () => {
     const fake = await startFake(() => ok("pong"));
     const text = await chatText({ baseUrl: fake.baseUrl, apiKey: "sk-test", model: "m" }, [{ type: "text", text: "ping" }]);
