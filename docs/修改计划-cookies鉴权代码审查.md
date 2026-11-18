@@ -46,13 +46,13 @@ yt-dlp 对 YouTube 鉴权**通常也依赖 `.google.com` / `accounts.google.com`
 
 ---
 
-## P1 — `DIGGO_COOKIES_FILE` 只在引擎启动时一次性探测，且无回退
+## P1 — `STILLSCRIBE_COOKIES_FILE` 只在引擎启动时一次性探测，且无回退
 
 **文件**：`electron/src/main/index.ts:51`（探测点）、`engine/src/modules/m2-download.ts`（消费点）
 **类型**：可用性 / 健壮性（altitude）
 
 ### 问题
-`startEngine` 在 spawn 时 `existsSync(cookiesFile)` 决定是否注入 `DIGGO_COOKIES_FILE`，**只判一次**。
+`startEngine` 在 spawn 时 `existsSync(cookiesFile)` 决定是否注入 `STILLSCRIBE_COOKIES_FILE`，**只判一次**。
 两种现实路径都坏：
 1. **首次使用**：用户先启动 App（此时无 `cookies.txt` → 不注入 → 回退到 `--cookies-from-browser`，
    正是本功能要规避的失败路径），再运行 `pnpm refresh-cookies` 生成 `cookies.txt`。新文件**要等
@@ -81,14 +81,14 @@ yt-dlp 对 YouTube 鉴权**通常也依赖 `.google.com` / `accounts.google.com`
 **类型**：可维护性（CLAUDE.md §5「路径常量集中在一个模块管理，不在各处硬编码字符串拼路径」）
 
 ### 问题
-- `DIGGO_WORK_ROOT ? resolve(env) : resolve("work")` 在 `serve.ts` 与 `refresh-cookies.ts` 逐字重复。
+- `STILLSCRIBE_WORK_ROOT ? resolve(env) : resolve("work")` 在 `serve.ts` 与 `refresh-cookies.ts` 逐字重复。
 - `path.join(workRoot, "cookies.txt")` 在 `refresh-cookies.ts` 与 `electron main` 各写一份。
 改名/改位置时需多处同步，漏改即静默读/写错位置。
 
 ### 修复
 在引擎侧路径常量模块（若无则新建 `engine/src/paths.ts`）集中导出：
 ```ts
-export function resolveWorkRoot(env = process.env.DIGGO_WORK_ROOT): string {
+export function resolveWorkRoot(env = process.env.STILLSCRIBE_WORK_ROOT): string {
   return env ? path.resolve(env) : path.resolve("work");
 }
 export const cookiesPath = (workRoot: string) => path.join(workRoot, "cookies.txt");

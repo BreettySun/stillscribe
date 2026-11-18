@@ -3,7 +3,7 @@
  * （CLAUDE.md 铁律 #1：打包后 Finder 启动只有精简 PATH，依赖 PATH 必然失效。）
  *
  * 解析优先级：
- *   1. 环境变量 DIGGO_<TOOL大写>（如 DIGGO_FFMPEG=/path/to/ffmpeg）
+ *   1. 环境变量 STILLSCRIBE_<TOOL大写>（如 STILLSCRIBE_FFMPEG=/path/to/ffmpeg）
  *   2. 仓库 `bin/<tool>`（自包含主路径，经 `pnpm setup-tools` 下载，脱离 Homebrew）
  *   3. DEFAULT_TOOLS（Homebrew 开发回退）
  *   找不到则抛出带提示的错误。
@@ -33,7 +33,7 @@ const DEFAULT_TOOLS: Record<ToolName, string> = {
 };
 
 function envKey(name: ToolName): string {
-  return "DIGGO_" + name.toUpperCase().replace(/-/g, "_");
+  return "STILLSCRIBE_" + name.toUpperCase().replace(/-/g, "_");
 }
 
 function isFile(p: string): boolean {

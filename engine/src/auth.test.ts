@@ -57,15 +57,15 @@ describe("令牌工具", () => {
 });
 
 describe("resolveAuth", () => {
-	it("有 DIGGO_TOKEN：直接用，不写令牌文件", () => {
-		const workRoot = mkdtempSync(path.join(tmpdir(), "diggo-auth-"));
-		const auth = resolveAuth(workRoot, { DIGGO_TOKEN: "from-env", DIGGO_ALLOWED_ORIGINS: "null" });
+	it("有 STILLSCRIBE_TOKEN：直接用，不写令牌文件", () => {
+		const workRoot = mkdtempSync(path.join(tmpdir(), "stillscribe-auth-"));
+		const auth = resolveAuth(workRoot, { STILLSCRIBE_TOKEN: "from-env", STILLSCRIBE_ALLOWED_ORIGINS: "null" });
 		expect(auth).toEqual({ token: "from-env", allowedOrigins: ["null"] });
 		expect(existsSync(engineTokenPath(workRoot))).toBe(false);
 	});
 
-	it("无 DIGGO_TOKEN：生成新令牌并写入仅本人可读的文件；每次启动都换新", () => {
-		const workRoot = mkdtempSync(path.join(tmpdir(), "diggo-auth-"));
+	it("无 STILLSCRIBE_TOKEN：生成新令牌并写入仅本人可读的文件；每次启动都换新", () => {
+		const workRoot = mkdtempSync(path.join(tmpdir(), "stillscribe-auth-"));
 		const file = engineTokenPath(workRoot);
 		writeFileSync(file, "stale\n", { mode: 0o644 }); // 上次运行的残留，且权限过宽
 

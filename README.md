@@ -1,4 +1,4 @@
-# Diggo Press
+# StillScribe
 
 把 **YouTube 视频 → 图文文章** 的手工流程封装成纯桌面 macOS 应用。一条 URL 进去，自动完成下载、逐秒抽帧加水印、去重选帧、拼宫格图，再由 Gemini 生成结构化文章，最后程序化导出带配图的本地文件：Word（`.docx`）、Markdown、HTML。
 
@@ -70,7 +70,7 @@
 pnpm install
 
 # 下载内置 CLI 二进制到 bin/（ffmpeg / ffprobe / yt-dlp / deno）
-pnpm --filter @diggo/engine setup-tools
+pnpm --filter @stillscribe/engine setup-tools
 ```
 
 要用 Gemini 自动生成文章，再准备一份本地配置并填入你自己的 API Key（不填也能跑，文章环节会停下来等你手动回填）：
@@ -86,7 +86,7 @@ cd engine
 pnpm run <youtube_url> [--quality 1080|1440] [--browser safari|chrome] [--threshold N] [--mode auto|semi] [--work-root <dir>]
 ```
 
-打通 M2 → M3 → M5 → M6 → M7 → M8。M7（文章生成）默认半自动：把宫格图 + 字幕交给模型，按 `Article` 契约生成 `article.json` 回填后重跑即续接导出；加 `--mode auto` 且在 `engine/.env` 配置 `DIGGO_GEMINI_API_KEY` 时直接调 Gemini 生成。
+打通 M2 → M3 → M5 → M6 → M7 → M8。M7（文章生成）默认半自动：把宫格图 + 字幕交给模型，按 `Article` 契约生成 `article.json` 回填后重跑即续接导出；加 `--mode auto` 且在 `engine/.env` 配置 `STILLSCRIBE_GEMINI_API_KEY` 时直接调 Gemini 生成。
 
 > **YouTube 鉴权**：YouTube 常要求登录验证。在 `<work-root>/cookies.txt` 放置 cookie 文件，或用 `--browser` 走 `yt-dlp --cookies-from-browser`。密钥与 cookie 只在本地，禁止提交进仓库。
 
@@ -98,7 +98,7 @@ pnpm dev
 
 或分别启动：`pnpm dev:engine`、`pnpm dev:ui`、`pnpm dev:desktop`。
 
-引擎服务环境变量：`DIGGO_WORK_ROOT`（默认 `./work`）、`DIGGO_PORT`（默认 `8787`）、`DIGGO_HOST`（默认 `127.0.0.1`）、`DIGGO_BROWSER`。
+引擎服务环境变量：`STILLSCRIBE_WORK_ROOT`（默认 `./work`）、`STILLSCRIBE_PORT`（默认 `8787`）、`STILLSCRIBE_HOST`（默认 `127.0.0.1`）、`STILLSCRIBE_BROWSER`。
 
 **接口鉴权**：引擎的所有 HTTP 接口都要带令牌（`Authorization: Bearer <token>`），并校验请求来源与 Host，防止本机浏览器里的其他网页调用引擎。日常使用无需手动配置：
 
@@ -106,7 +106,7 @@ pnpm dev
 - 单独跑引擎（`pnpm dev:engine`）：引擎自动生成令牌并写入 `<工作根>/engine-token`（仅当前用户可读），`pnpm dev:ui` 的开发代理会自动读取并附加。
 - 用 curl 等工具直接调接口时，自己带上请求头：`curl -H "Authorization: Bearer $(cat engine/work/engine-token)" http://127.0.0.1:8787/tasks`。
 
-相关环境变量：`DIGGO_TOKEN`（指定令牌，省略则自动生成）、`DIGGO_ALLOWED_ORIGINS`（允许跨源访问的页面来源，逗号分隔，默认为空）。
+相关环境变量：`STILLSCRIBE_TOKEN`（指定令牌，省略则自动生成）、`STILLSCRIBE_ALLOWED_ORIGINS`（允许跨源访问的页面来源，逗号分隔，默认为空）。
 
 ---
 

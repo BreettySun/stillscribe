@@ -13,7 +13,7 @@
 
 ```bash
 pnpm install
-pnpm --filter @diggo/engine setup-tools   # 下载 ffmpeg / ffprobe / yt-dlp / deno 到 bin/
+pnpm --filter @stillscribe/engine setup-tools   # 下载 ffmpeg / ffprobe / yt-dlp / deno 到 bin/
 cp engine/.env.example engine/.env        # 可选：填入 Gemini API Key 以启用自动生成文章
 pnpm dev                                  # 引擎 + 界面 + 桌面壳一起启动
 ```

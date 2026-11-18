@@ -28,17 +28,17 @@ import { resolveGeminiKey } from "./apiKey";
 // 运行时 __dirname = electron/out/main → 上溯三级到仓库根。
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 
-// 包名是 @diggo/desktop，会让 userData 落到 "Application Support/@diggo/desktop"（难看且含斜杠）。
-// 统一显示名，使 userData = "Application Support/diggo-press"。必须在 app ready 前调用。
-app.setName("diggo-press");
+// 包名是 @stillscribe/desktop，会让 userData 落到 "Application Support/@stillscribe/desktop"（难看且含斜杠）。
+// 统一显示名，使 userData = "Application Support/stillscribe"。必须在 app ready 前调用。
+app.setName("stillscribe");
 
 /**
- * 工作根（与引擎一致）：可被 DIGGO_WORK_ROOT 覆盖。
+ * 工作根（与引擎一致）：可被 STILLSCRIBE_WORK_ROOT 覆盖。
  * - 打包后：app.getPath("userData")/work（仓库目录不存在/不可写）。
  * - 开发态：仓库 engine/work（与 `pnpm dev:engine` 共用同一个 tasks.db，队列互通）。
  */
 function getWorkRoot(): string {
-	if (process.env.DIGGO_WORK_ROOT) return process.env.DIGGO_WORK_ROOT;
+	if (process.env.STILLSCRIBE_WORK_ROOT) return process.env.STILLSCRIBE_WORK_ROOT;
 	if (app.isPackaged) return path.join(app.getPath("userData"), "work");
 	return path.join(REPO_ROOT, "engine", "work");
 }
@@ -50,13 +50,13 @@ function binDir(): string {
 
 /** yt-dlp 绝对路径（禁止依赖 PATH，铁律 #1）：env 覆盖 > 内置 bin/。 */
 function ytDlpPath(): string {
-	if (process.env.DIGGO_YT_DLP) return process.env.DIGGO_YT_DLP;
+	if (process.env.STILLSCRIBE_YT_DLP) return process.env.STILLSCRIBE_YT_DLP;
 	return path.join(binDir(), "yt-dlp");
 }
 
 /** deno 绝对路径（yt-dlp 解 YouTube nsig 的 JS 运行时）：env 覆盖 > 内置 bin/。 */
 function denoPath(): string {
-	return process.env.DIGGO_DENO ?? path.join(binDir(), "deno");
+	return process.env.STILLSCRIBE_DENO ?? path.join(binDir(), "deno");
 }
 
 /** yt-dlp 的 --js-runtimes 参数；deno 不存在时返回 []（降级）。 */
@@ -94,7 +94,7 @@ async function refreshCookies(browser: string): Promise<{ kept: number }> {
 	const out = path.join(workRoot, "cookies.txt");
 	const tmp = path.join(
 		tmpdir(),
-		`diggo-cookies-${process.pid}-${Date.now()}.txt`,
+		`stillscribe-cookies-${process.pid}-${Date.now()}.txt`,
 	);
 	try {
 		await runYtDlp([
@@ -172,19 +172,19 @@ function startEngine(workRoot: string): void {
 	const bin = binDir();
 	const env: NodeJS.ProcessEnv = {
 		...process.env,
-		DIGGO_HOST: "127.0.0.1",
-		DIGGO_PORT: String(enginePort),
-		DIGGO_WORK_ROOT: workRoot,
+		STILLSCRIBE_HOST: "127.0.0.1",
+		STILLSCRIBE_PORT: String(enginePort),
+		STILLSCRIBE_WORK_ROOT: workRoot,
 		// 接口鉴权：令牌 + 允许的页面来源（显式覆盖，不继承外部同名 env）。
-		DIGGO_TOKEN: engineToken,
-		DIGGO_ALLOWED_ORIGINS: rendererOrigin(),
+		STILLSCRIBE_TOKEN: engineToken,
+		STILLSCRIBE_ALLOWED_ORIGINS: rendererOrigin(),
 		// 引擎绝对路径找 CLI（铁律 #1）：env 优先，打包后指向 resources/bin，引擎保持 Electron-agnostic。
-		DIGGO_YT_DLP: path.join(bin, "yt-dlp"),
-		DIGGO_FFMPEG: path.join(bin, "ffmpeg"),
-		DIGGO_FFPROBE: path.join(bin, "ffprobe"),
-		DIGGO_DENO: path.join(bin, "deno"),
+		STILLSCRIBE_YT_DLP: path.join(bin, "yt-dlp"),
+		STILLSCRIBE_FFMPEG: path.join(bin, "ffmpeg"),
+		STILLSCRIBE_FFPROBE: path.join(bin, "ffprobe"),
+		STILLSCRIBE_DENO: path.join(bin, "deno"),
 		// 打包后 M7 全自动用的 Gemini Key（safeStorage 解密）；dev 下 undefined，引擎自读 engine/.env。
-		...(geminiKey ? { DIGGO_GEMINI_API_KEY: geminiKey } : {}),
+		...(geminiKey ? { STILLSCRIBE_GEMINI_API_KEY: geminiKey } : {}),
 	};
 
 	if (app.isPackaged) {
@@ -196,7 +196,7 @@ function startEngine(workRoot: string): void {
 			stdio: ["ignore", "inherit", "inherit"],
 		});
 	} else {
-		engine = spawn("pnpm", ["--filter", "@diggo/engine", "serve"], {
+		engine = spawn("pnpm", ["--filter", "@stillscribe/engine", "serve"], {
 			cwd: REPO_ROOT,
 			env,
 			stdio: ["ignore", "inherit", "inherit"],
@@ -251,7 +251,7 @@ function createWindow(origin: string): BrowserWindow {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
-			additionalArguments: [`--diggo-origin=${origin}`],
+			additionalArguments: [`--stillscribe-origin=${origin}`],
 		},
 	});
 	win.once("ready-to-show", () => win.show());
@@ -297,20 +297,20 @@ function buildMenu(): void {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-ipcMain.handle("diggo:reveal", (_e, p: unknown) => {
+ipcMain.handle("stillscribe:reveal", (_e, p: unknown) => {
 	if (typeof p === "string" && p) shell.showItemInFolder(p);
 });
 
-ipcMain.on("diggo:notify", (_e, payload: { title?: string; body?: string }) => {
+ipcMain.on("stillscribe:notify", (_e, payload: { title?: string; body?: string }) => {
 	if (!Notification.isSupported()) return;
 	new Notification({
-		title: payload?.title ?? "diggo-press",
+		title: payload?.title ?? "StillScribe",
 		body: payload?.body ?? "",
 	}).show();
 });
 
 // 刷新 cookie：在主进程（可访问浏览器钥匙串、可弹系统授权框）执行，写入引擎 workRoot/cookies.txt。
-ipcMain.handle("diggo:refresh-cookies", (_e, browser: unknown) =>
+ipcMain.handle("stillscribe:refresh-cookies", (_e, browser: unknown) =>
 	refreshCookies(typeof browser === "string" && browser ? browser : "chrome"),
 );
 

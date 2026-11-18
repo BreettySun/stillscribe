@@ -3,12 +3,12 @@
  *
  * 【铁律 #6】Key 只在本地、绝不进 bundle/dmg/仓库。用 Electron safeStorage（macOS 钥匙串绑定本机本用户）
  * 加密存于 userData/gemini-key.enc。引擎保持 Electron-agnostic：主进程解密后经 env 注入
- * （DIGGO_GEMINI_API_KEY），与 DIGGO_YT_DLP 等注入同一套路。
+ * （STILLSCRIBE_GEMINI_API_KEY），与 STILLSCRIBE_YT_DLP 等注入同一套路。
  *
  * dev 下本模块直接返回 undefined：引擎由 `pnpm dev:engine`(tsx) 跑、自行 loadDotEnv() 读 engine/.env，
  * 不经此路径，避免 enc/.env 双源混淆、也不在 dev 产生 enc 文件。
  *
- * 首次配置（packaged）：把明文 Key 放进 userData/gemini-key.txt（或导出 env DIGGO_GEMINI_API_KEY），
+ * 首次配置（packaged）：把明文 Key 放进 userData/gemini-key.txt（或导出 env STILLSCRIBE_GEMINI_API_KEY），
  * 首启自动加密入 gemini-key.enc 并删除明文 txt。换 Key：删 enc、放新 txt、重启。
  */
 import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -24,7 +24,7 @@ function keyTxtPath(): string {
 
 /** 找一次性投放的明文种子：env > userData/gemini-key.txt。 */
 function readSeed(): string | undefined {
-	const fromEnv = process.env.DIGGO_GEMINI_API_KEY;
+	const fromEnv = process.env.STILLSCRIBE_GEMINI_API_KEY;
 	if (fromEnv && fromEnv.trim()) return fromEnv.trim();
 	const txt = keyTxtPath();
 	if (existsSync(txt)) {

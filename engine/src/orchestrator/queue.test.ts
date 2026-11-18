@@ -106,7 +106,7 @@ describe("exportArticle 导出本地文件", () => {
 
   /** 造一个停在 awaiting_review、带 article 与（假）HD 帧的任务。 */
   async function setup() {
-    const workDir = await mkdtemp(path.join(tmpdir(), "diggo-orch-"));
+    const workDir = await mkdtemp(path.join(tmpdir(), "stillscribe-orch-"));
     const td = new TaskDir(workDir);
     await mkdir(td.hd, { recursive: true });
     await writeFile(path.join(td.hd, "00_00_01.jpg"), "frame-1");

@@ -27,7 +27,7 @@ export async function refreshCookies(opts: RefreshCookiesOptions): Promise<{ kep
   const url = opts.url ?? "https://www.youtube.com/watch?v=jNQXAC9IVRw";
   mkdirSync(opts.workRoot, { recursive: true });
   const out = cookiesPath(opts.workRoot);
-  const tmp = path.join(tmpdir(), `diggo-cookies-${process.pid}-${Date.now()}.txt`);
+  const tmp = path.join(tmpdir(), `stillscribe-cookies-${process.pid}-${Date.now()}.txt`);
 
   try {
     await runCmd(

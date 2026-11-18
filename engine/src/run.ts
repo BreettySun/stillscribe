@@ -60,7 +60,7 @@ async function runPipeline(cli: Cli): Promise<void> {
     mode: cli.mode,
   };
 
-  // 按任务即时探测 <workRoot>/cookies.txt（或 DIGGO_COOKIES_FILE 覆盖）；无效则回退 --cookies-from-browser。
+  // 按任务即时探测 <workRoot>/cookies.txt（或 STILLSCRIBE_COOKIES_FILE 覆盖）；无效则回退 --cookies-from-browser。
   const cookiesFile = resolveCookiesFile(cli.workRoot);
   const { taskDir: td, videoId, videoTitle, frames, grids } = await runToGrids(params, {
     workRoot: cli.workRoot,
@@ -75,7 +75,7 @@ async function runPipeline(cli: Cli): Promise<void> {
   if (cli.mode === "auto" && !existsSync(td.articleJson)) {
     const cfg = resolveAIConfig();
     if (!cfg.apiKey) {
-      console.error("\n⏸  --mode auto 需在 engine/.env 配置 DIGGO_GEMINI_API_KEY；未设置，降级为半自动（见下）。");
+      console.error("\n⏸  --mode auto 需在 engine/.env 配置 STILLSCRIBE_GEMINI_API_KEY；未设置，降级为半自动（见下）。");
     } else {
       const client = createGeminiClient({ apiKey: cfg.apiKey, model: cfg.model });
       const { warnings: w } = await runArticle(

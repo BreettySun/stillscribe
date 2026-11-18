@@ -54,7 +54,7 @@ export function isLoopbackHost(host: string | undefined): boolean {
 	return ["127.0.0.1", "localhost", "[::1]"].includes(name.toLowerCase());
 }
 
-/** 解析逗号分隔的来源列表（env DIGGO_ALLOWED_ORIGINS）。 */
+/** 解析逗号分隔的来源列表（env STILLSCRIBE_ALLOWED_ORIGINS）。 */
 export function parseOrigins(value: string | undefined): string[] {
 	return (value ?? "")
 		.split(",")
@@ -64,13 +64,13 @@ export function parseOrigins(value: string | undefined): string[] {
 
 /**
  * 解析引擎进程的鉴权配置。
- * - 有 env DIGGO_TOKEN（由 Electron 主进程注入）：直接用，不落盘。
+ * - 有 env STILLSCRIBE_TOKEN（由 Electron 主进程注入）：直接用，不落盘。
  * - 没有：自己生成一个，写入 <workRoot>/engine-token 供本机的开发代理读取。
  *   每次启动都换新，旧令牌随之失效。
  */
 export function resolveAuth(workRoot: string, env: NodeJS.ProcessEnv = process.env): AuthConfig {
-	const allowedOrigins = parseOrigins(env.DIGGO_ALLOWED_ORIGINS);
-	const fromEnv = env.DIGGO_TOKEN?.trim();
+	const allowedOrigins = parseOrigins(env.STILLSCRIBE_ALLOWED_ORIGINS);
+	const fromEnv = env.STILLSCRIBE_TOKEN?.trim();
 	if (fromEnv) return { token: fromEnv, allowedOrigins };
 
 	const token = generateToken();

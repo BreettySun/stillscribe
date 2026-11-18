@@ -41,10 +41,10 @@ describe("slugifyTitle", () => {
 });
 
 describe("工作根 / cookies 路径解析", () => {
-  const prev = process.env.DIGGO_COOKIES_FILE;
+  const prev = process.env.STILLSCRIBE_COOKIES_FILE;
   afterEach(() => {
-    if (prev === undefined) delete process.env.DIGGO_COOKIES_FILE;
-    else process.env.DIGGO_COOKIES_FILE = prev;
+    if (prev === undefined) delete process.env.STILLSCRIBE_COOKIES_FILE;
+    else process.env.STILLSCRIBE_COOKIES_FILE = prev;
   });
 
   it("resolveWorkRoot：env 优先，否则 ./work（均绝对化）", () => {
@@ -58,8 +58,8 @@ describe("工作根 / cookies 路径解析", () => {
   });
 
   it("resolveCookiesFile：缺失→undefined；有 cookie→路径；置空/仅注释头→undefined（P1 回退）", () => {
-    delete process.env.DIGGO_COOKIES_FILE;
-    const dir = mkdtempSync(path.join(tmpdir(), "diggo-cookies-test-"));
+    delete process.env.STILLSCRIBE_COOKIES_FILE;
+    const dir = mkdtempSync(path.join(tmpdir(), "stillscribe-cookies-test-"));
     try {
       // 缺失
       expect(resolveCookiesFile(dir)).toBeUndefined();
@@ -74,12 +74,12 @@ describe("工作根 / cookies 路径解析", () => {
     }
   });
 
-  it("resolveCookiesFile：DIGGO_COOKIES_FILE 显式覆盖优先于 workRoot", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "diggo-cookies-ovr-"));
+  it("resolveCookiesFile：STILLSCRIBE_COOKIES_FILE 显式覆盖优先于 workRoot", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "stillscribe-cookies-ovr-"));
     try {
       const override = path.join(dir, "explicit.txt");
       writeFileSync(override, "youtube.com\tTRUE\t/\tTRUE\t0\tSID\tx\n");
-      process.env.DIGGO_COOKIES_FILE = override;
+      process.env.STILLSCRIBE_COOKIES_FILE = override;
       expect(resolveCookiesFile("/nonexistent/work")).toBe(override);
     } finally {
       rmSync(dir, { recursive: true, force: true });

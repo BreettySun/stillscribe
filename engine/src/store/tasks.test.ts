@@ -64,7 +64,7 @@ describe("TaskStore", () => {
   });
 
   it("旧库迁移：补 outputs 列，遗留的 outputDocx 读成 outputs.docx", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "diggo-store-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "stillscribe-store-"));
     const file = path.join(dir, "tasks.db");
     // 按旧版表结构（含 outputDocx / feishuUrl，无 outputs）造一条已完成的任务。
     const old = new Database(file);

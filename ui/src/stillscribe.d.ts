@@ -1,5 +1,5 @@
 /** Electron preload 注入的桥（纯 Web 模式下不存在）。 */
-interface DiggoBridge {
+interface StillscribeBridge {
   engineOrigin: string;
   platform: string;
   revealInFolder: (path: string) => Promise<void>;
@@ -8,5 +8,5 @@ interface DiggoBridge {
 }
 
 interface Window {
-  diggo?: DiggoBridge;
+  stillscribe?: StillscribeBridge;
 }

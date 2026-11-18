@@ -114,10 +114,10 @@ onUnmounted(() => disconnect?.());
 		<header class="app-titlebar">
 			<img
 				src="@/assets/icon/icon-trans.svg"
-				alt="Diggo Press"
+				alt="StillScribe"
 				width="24"
 				height="24" />
-			<span class="app-title">Diggo Press</span>
+			<span class="app-title">StillScribe</span>
 			<span class="app-engine">
 				<span
 					class="dot"

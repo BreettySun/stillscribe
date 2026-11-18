@@ -14,7 +14,7 @@ const ENGINE_DIR = fileURLToPath(new URL("../engine", import.meta.url));
  * 读取与引擎相同的开发配置：进程环境变量优先，其次 engine/.env（引擎自己也读它，见 engine/src/env.ts）。
  * 只挑代理需要的几个键，不把 engine/.env 里的其他内容（如 Gemini Key）载入本进程。
  */
-const KEYS = ["DIGGO_ENGINE_URL", "DIGGO_PORT", "DIGGO_WORK_ROOT", "DIGGO_TOKEN"] as const;
+const KEYS = ["STILLSCRIBE_ENGINE_URL", "STILLSCRIBE_PORT", "STILLSCRIBE_WORK_ROOT", "STILLSCRIBE_TOKEN"] as const;
 function readEngineDotEnv(): Record<string, string | undefined> {
   try {
     return parseEnv(readFileSync(path.join(ENGINE_DIR, ".env"), "utf-8"));
@@ -27,20 +27,20 @@ const cfg = Object.fromEntries(
   KEYS.map((k) => [k, process.env[k] || dotEnv[k] || undefined]),
 ) as Record<(typeof KEYS)[number], string | undefined>;
 
-const ENGINE = cfg.DIGGO_ENGINE_URL ?? `http://127.0.0.1:${cfg.DIGGO_PORT ?? 8787}`;
+const ENGINE = cfg.STILLSCRIBE_ENGINE_URL ?? `http://127.0.0.1:${cfg.STILLSCRIBE_PORT ?? 8787}`;
 
 /**
  * 引擎接口令牌（engine/src/auth.ts）。纯 Web 开发模式下浏览器页面不持有令牌，由本代理代为附加。
- * 来源：DIGGO_TOKEN > 引擎自动生成的令牌文件 <工作根>/engine-token（文件名与 engine/src/paths.ts 一致）。
+ * 来源：STILLSCRIBE_TOKEN > 引擎自动生成的令牌文件 <工作根>/engine-token（文件名与 engine/src/paths.ts 一致）。
  * 工作根的解析与引擎一致（resolveWorkRoot）：相对路径按 engine/ 目录解析，默认 engine/work。
  * 令牌文件每个请求现读：引擎重启会换新令牌，无需跟着重启 Vite。
  */
 const TOKEN_FILE = path.join(
-  path.resolve(ENGINE_DIR, cfg.DIGGO_WORK_ROOT ?? "work"),
+  path.resolve(ENGINE_DIR, cfg.STILLSCRIBE_WORK_ROOT ?? "work"),
   "engine-token",
 );
 function engineToken(): string | undefined {
-  if (cfg.DIGGO_TOKEN) return cfg.DIGGO_TOKEN;
+  if (cfg.STILLSCRIBE_TOKEN) return cfg.STILLSCRIBE_TOKEN;
   try {
     return readFileSync(TOKEN_FILE, "utf-8").trim() || undefined;
   } catch {

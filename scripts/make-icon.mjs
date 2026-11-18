@@ -52,7 +52,7 @@ await sharp({
 	.toFile(PNG);
 
 // 用系统 sips/iconutil 生成 .icns（无第三方依赖）。
-const iconset = mkdtempSync(path.join(tmpdir(), "diggo-iconset-"));
+const iconset = mkdtempSync(path.join(tmpdir(), "stillscribe-iconset-"));
 const sizes = [
 	["icon_16x16", 16], ["icon_16x16@2x", 32],
 	["icon_32x32", 32], ["icon_32x32@2x", 64],

@@ -277,7 +277,7 @@ export class Orchestrator {
       const cookiesFile = resolveCookiesFile(this.opts.workRoot);
       const grids = await runToGrids(task.params, {
         workRoot: this.opts.workRoot,
-        // 任务级 browser 优先，回退到启动时的全局 DIGGO_BROWSER 默认。
+        // 任务级 browser 优先，回退到启动时的全局 STILLSCRIBE_BROWSER 默认。
         browser: task.params.browser ?? this.opts.browser,
         ...(cookiesFile ? { cookiesFile } : {}),
         signal: ac.signal,

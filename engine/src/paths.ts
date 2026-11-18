@@ -10,8 +10,8 @@ import type { Timestamp } from "@shared/types";
 const NAME_RE = /^(\d{2})_(\d{2})_(\d{2})$/;
 const HTTPONLY = "#HttpOnly_";
 
-/** 工作根目录解析 —— 全项目唯一定义（DIGGO_WORK_ROOT，默认 ./work）。 */
-export function resolveWorkRoot(env = process.env.DIGGO_WORK_ROOT): string {
+/** 工作根目录解析 —— 全项目唯一定义（STILLSCRIBE_WORK_ROOT，默认 ./work）。 */
+export function resolveWorkRoot(env = process.env.STILLSCRIBE_WORK_ROOT): string {
   return env ? path.resolve(env) : path.resolve("work");
 }
 
@@ -30,13 +30,13 @@ export function cookiesPath(workRoot: string): string {
 
 /**
  * 解析本任务实际可用的 cookies.txt（P1 方案 A：按任务即时探测，跑完 refresh-cookies 无需重启引擎即生效）。
- * 来源优先级：DIGGO_COOKIES_FILE 显式覆盖 > <workRoot>/cookies.txt。
+ * 来源优先级：STILLSCRIBE_COOKIES_FILE 显式覆盖 > <workRoot>/cookies.txt。
  * 仅当文件存在且含至少一条 cookie 行时返回路径；否则返回 undefined，调用方回退 --cookies-from-browser。
  * （文件被置空/只剩注释头时视为无效 → 自动回退浏览器，而非静默撞 bot 验证。）
  */
 export function resolveCookiesFile(workRoot: string): string | undefined {
-  const file = process.env.DIGGO_COOKIES_FILE
-    ? path.resolve(process.env.DIGGO_COOKIES_FILE)
+  const file = process.env.STILLSCRIBE_COOKIES_FILE
+    ? path.resolve(process.env.STILLSCRIBE_COOKIES_FILE)
     : cookiesPath(workRoot);
   if (!existsSync(file)) return undefined;
   const hasCookie = readFileSync(file, "utf-8")

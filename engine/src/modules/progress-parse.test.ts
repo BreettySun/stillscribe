@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 // arg-builder 解析这些纯函数不依赖工具路径，但 m3 顶部 import toolPath 间接需要；保持与 args.test 同款桩。
 beforeAll(() => {
-  process.env.DIGGO_YT_DLP = process.execPath;
-  process.env.DIGGO_FFMPEG = process.execPath;
-  process.env.DIGGO_FFPROBE = process.execPath;
+  process.env.STILLSCRIBE_YT_DLP = process.execPath;
+  process.env.STILLSCRIBE_FFMPEG = process.execPath;
+  process.env.STILLSCRIBE_FFPROBE = process.execPath;
 });
 
 const { parseDownloadRatio, buildDownloadArgs } = await import("./m2-download.ts");

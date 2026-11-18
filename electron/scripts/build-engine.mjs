@@ -39,8 +39,8 @@ await build({
   // 用 __filename 还原其值（esbuild 标准配方：define 把 token 换成标识符，banner 定义该标识符）。
   define: {
     "import.meta.url": "import_meta_url",
-    // M7 真模板烤入：prompt.ts 内 `typeof __DIGGO_PROMPT_TEMPLATE__` guard 在打包后取到此常量。
-    __DIGGO_PROMPT_TEMPLATE__: JSON.stringify(promptTemplateText),
+    // M7 真模板烤入：prompt.ts 内 `typeof __STILLSCRIBE_PROMPT_TEMPLATE__` guard 在打包后取到此常量。
+    __STILLSCRIBE_PROMPT_TEMPLATE__: JSON.stringify(promptTemplateText),
   },
   banner: {
     js: "const import_meta_url = require('url').pathToFileURL(__filename).href;",

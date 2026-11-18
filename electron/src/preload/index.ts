@@ -5,22 +5,22 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 function originFromArgv(): string {
-	const prefix = "--diggo-origin=";
+	const prefix = "--stillscribe-origin=";
 	const arg = process.argv.find((a) => a.startsWith(prefix));
 	return arg ? arg.slice(prefix.length) : "";
 }
 
-contextBridge.exposeInMainWorld("diggo", {
+contextBridge.exposeInMainWorld("stillscribe", {
 	/** 引擎 HTTP 源，如 http://127.0.0.1:51234。 */
 	engineOrigin: originFromArgv(),
 	platform: process.platform,
 	/** 在访达中定位文件。 */
 	revealInFolder: (p: string): Promise<void> =>
-		ipcRenderer.invoke("diggo:reveal", p),
+		ipcRenderer.invoke("stillscribe:reveal", p),
 	/** 系统通知。 */
 	notify: (title: string, body: string): void =>
-		ipcRenderer.send("diggo:notify", { title, body }),
+		ipcRenderer.send("stillscribe:notify", { title, body }),
 	/** 从浏览器刷新 youtube cookie（主进程读钥匙串），返回写入条数。 */
 	refreshCookies: (browser: string): Promise<{ kept: number }> =>
-		ipcRenderer.invoke("diggo:refresh-cookies", browser),
+		ipcRenderer.invoke("stillscribe:refresh-cookies", browser),
 });

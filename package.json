@@ -1,5 +1,5 @@
 {
-	"name": "Diggo Press",
+	"name": "stillscribe",
 	"version": "0.1.0",
 	"private": true,
 	"license": "MIT",
@@ -10,13 +10,13 @@
 	"description": "YouTube 视频 → 图文文章 桌面应用（monorepo 根）",
 	"scripts": {
 		"dev": "concurrently -n engine,ui -c cyan,magenta \"pnpm dev:engine\" \"pnpm dev:ui\" \"pnpm dev:desktop\"",
-		"dev:engine": "pnpm --filter @diggo/engine dev",
-		"dev:ui": "pnpm --filter @diggo/ui dev",
-		"dev:desktop": "pnpm --filter @diggo/desktop dev",
+		"dev:engine": "pnpm --filter @stillscribe/engine dev",
+		"dev:ui": "pnpm --filter @stillscribe/ui dev",
+		"dev:desktop": "pnpm --filter @stillscribe/desktop dev",
 		"dist": "bash scripts/package-mac.sh",
-		"typecheck": "pnpm --filter @diggo/engine typecheck && pnpm --filter @diggo/ui typecheck && pnpm --filter @diggo/desktop typecheck",
-		"test": "pnpm --filter @diggo/engine test",
-		"refresh-cookies": "pnpm --filter @diggo/engine refresh-cookies"
+		"typecheck": "pnpm --filter @stillscribe/engine typecheck && pnpm --filter @stillscribe/ui typecheck && pnpm --filter @stillscribe/desktop typecheck",
+		"test": "pnpm --filter @stillscribe/engine test",
+		"refresh-cookies": "pnpm --filter @stillscribe/engine refresh-cookies"
 	},
 	"devDependencies": {
 		"concurrently": "^9.1.0"

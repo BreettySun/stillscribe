@@ -179,7 +179,7 @@ describe("renderHtml", () => {
 
 describe("copyExportImages", () => {
 	it("按规划文件名原样拷贝；缺图与非法时间戳记 warning 并标记 missing；重跑清掉旧文件", async () => {
-		const root = await mkdtemp(path.join(tmpdir(), "diggo-export-"));
+		const root = await mkdtemp(path.join(tmpdir(), "stillscribe-export-"));
 		const hd = path.join(root, "01_hd");
 		const images = path.join(root, "article", "images");
 		await mkdir(hd, { recursive: true });

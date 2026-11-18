@@ -6,7 +6,7 @@
  *   pnpm refresh-cookies                       # 默认 chrome，写到 engine/work/cookies.txt
  *   pnpm refresh-cookies --browser safari
  *   pnpm refresh-cookies --url <youtube-url>   # 自定义触发用 URL
- *   DIGGO_WORK_ROOT=/path pnpm refresh-cookies  # 自定义工作根
+ *   STILLSCRIBE_WORK_ROOT=/path pnpm refresh-cookies  # 自定义工作根
  *
  * 原理：--cookies-from-browser 从浏览器读 cookie（需终端可访问钥匙串），先写出全量临时文件，
  *       再过滤成只含 youtube.com 的 cookie 写入最终文件（不把无关站点的 cookie 落盘）。
@@ -20,7 +20,7 @@ function flag(name: string, fallback: string): string {
 }
 
 async function main(): Promise<void> {
-  const browser = flag("browser", process.env.DIGGO_BROWSER || "chrome");
+  const browser = flag("browser", process.env.STILLSCRIBE_BROWSER || "chrome");
   const url = flag("url", "https://www.youtube.com/watch?v=jNQXAC9IVRw");
   const workRoot = resolveWorkRoot();
 

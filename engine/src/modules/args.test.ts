@@ -3,10 +3,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 // toolPath 会校验文件存在；测试与机器解耦，用 node 自身可执行文件冒充工具路径。
 // 只断言生成的命令“参数形状”，不实际调用工具。
 beforeAll(() => {
-  process.env.DIGGO_YT_DLP = process.execPath;
-  process.env.DIGGO_FFMPEG = process.execPath;
+  process.env.STILLSCRIBE_YT_DLP = process.execPath;
+  process.env.STILLSCRIBE_FFMPEG = process.execPath;
   // deno 为可选 JS 运行时（解 nsig）：用 node 自身冒充，使 --js-runtimes 参数确定可断言。
-  process.env.DIGGO_DENO = process.execPath;
+  process.env.STILLSCRIBE_DENO = process.execPath;
 });
 
 const { buildInfoArgs, buildDownloadArgs, buildSubsArgs } = await import("./m2-download.ts");

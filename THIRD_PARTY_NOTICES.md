@@ -4,7 +4,7 @@
 
 ## 一、外部命令行工具（不在仓库内）
 
-这四个可执行文件不进 git。`pnpm --filter @diggo/engine setup-tools` 会按 [engine/scripts/setup-tools.ts](engine/scripts/setup-tools.ts) 里固定的地址和 sha256 把它们下载到 `bin/`，打包时再随安装包一起分发。引擎只以独立子进程的方式调用它们，不链接其代码。
+这四个可执行文件不进 git。`pnpm --filter @stillscribe/engine setup-tools` 会按 [engine/scripts/setup-tools.ts](engine/scripts/setup-tools.ts) 里固定的地址和 sha256 把它们下载到 `bin/`，打包时再随安装包一起分发。引擎只以独立子进程的方式调用它们，不链接其代码。
 
 | 工具 | 版本 | 来源 | 许可证 |
 | --- | --- | --- | --- |

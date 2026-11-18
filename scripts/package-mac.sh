@@ -6,7 +6,7 @@
 #
 # 做两件事：
 #   1) 打包：electron-vite build → 引擎 bundle → better-sqlite3 重编(Electron ABI) → electron-builder
-#      产物：release/diggo-press-<version>-arm64.dmg
+#      产物：release/stillscribe-<version>-arm64.dmg
 #   2) 恢复：把 better-sqlite3 重编回系统 Node ABI（否则引擎 dev/test 会坏）。
 #      用 trap EXIT 保证即使打包失败也会恢复，不把开发环境留在半坏状态。
 set -uo pipefail
@@ -22,7 +22,7 @@ restore() {
 trap restore EXIT
 
 echo "→ 打包 macOS (arm64)…"
-pnpm --filter @diggo/desktop dist
+pnpm --filter @stillscribe/desktop dist
 status=$?
 
 if [ $status -eq 0 ]; then

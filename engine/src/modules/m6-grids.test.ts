@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 
 beforeAll(() => {
-  process.env.DIGGO_FFMPEG = process.execPath; // toolPath 存在性校验解耦
+  process.env.STILLSCRIBE_FFMPEG = process.execPath; // toolPath 存在性校验解耦
 });
 
 const { chunkFrames, gridName, buildGridArgs } = await import("./m6-grids.ts");

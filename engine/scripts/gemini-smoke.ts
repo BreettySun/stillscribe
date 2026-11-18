@@ -2,8 +2,8 @@
  * 真·Gemini 连通性冒烟测试：用真实 SDK 跑一次 generateContent，验证
  *   API Key 通、responseSchema(大写 Type) 通、res.text → parseAndValidateArticle 通。
  *
- * 用法：在 engine/.env 配好 DIGGO_GEMINI_API_KEY 后，
- *   pnpm --filter @diggo/engine gemini-smoke
+ * 用法：在 engine/.env 配好 STILLSCRIBE_GEMINI_API_KEY 后，
+ *   pnpm --filter @stillscribe/engine gemini-smoke
  * 它只发一张 1×1 占位图 + 一句提示词，成本极低；不下载视频、不依赖任务目录。
  */
 import { loadDotEnv } from "../src/env.ts";
@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   loadDotEnv();
   const cfg = resolveAIConfig();
   if (!cfg.apiKey) {
-    console.error("❌ 缺少 DIGGO_GEMINI_API_KEY —— 请在 engine/.env 配置（见 engine/.env.example）。");
+    console.error("❌ 缺少 STILLSCRIBE_GEMINI_API_KEY —— 请在 engine/.env 配置（见 engine/.env.example）。");
     process.exit(1);
   }
   console.error(`→ 调用模型 ${cfg.model} …`);

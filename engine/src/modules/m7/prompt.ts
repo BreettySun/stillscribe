@@ -22,7 +22,7 @@ export const PROMPT_TEMPLATE_FILE = path.join(here, "prompt.template.txt");
  * 打包时由 esbuild define 注入的真模板常量（见 electron/scripts/build-engine.mjs）。
  * dev/tsx 下该标识符不存在——`typeof` 守卫保证不抛错（返回 "undefined"），从而回退到读源 .txt。
  */
-declare const __DIGGO_PROMPT_TEMPLATE__: string | undefined;
+declare const __STILLSCRIBE_PROMPT_TEMPLATE__: string | undefined;
 
 export interface PromptVars {
   /** 视频标题。 */
@@ -45,13 +45,13 @@ const PLACEHOLDER_TEMPLATE = `【占位提示词 — 待录入既有半自动同
 
 /**
  * 解析默认提示词模板（未做 {{var}} 替换）。取模板优先级：
- *   1) 打包时烤入的 __DIGGO_PROMPT_TEMPLATE__（packaged）；
+ *   1) 打包时烤入的 __STILLSCRIBE_PROMPT_TEMPLATE__（packaged）；
  *   2) 源 prompt.template.txt（dev，单一事实来源）；
  *   3) 占位模板（都没有时兜底）。
  */
 export async function loadPromptTemplate(): Promise<string> {
-  if (typeof __DIGGO_PROMPT_TEMPLATE__ === "string" && __DIGGO_PROMPT_TEMPLATE__) {
-    return __DIGGO_PROMPT_TEMPLATE__;
+  if (typeof __STILLSCRIBE_PROMPT_TEMPLATE__ === "string" && __STILLSCRIBE_PROMPT_TEMPLATE__) {
+    return __STILLSCRIBE_PROMPT_TEMPLATE__;
   }
   if (existsSync(PROMPT_TEMPLATE_FILE)) {
     return readFile(PROMPT_TEMPLATE_FILE, "utf-8");

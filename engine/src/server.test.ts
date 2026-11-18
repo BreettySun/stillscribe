@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { normalizeFormats, resolveWithin } from "./server.ts";
 
-const DIR = "/tmp/diggo-task/01_hd";
+const DIR = "/tmp/stillscribe-task/01_hd";
 
 describe("resolveWithin 路径穿越防护", () => {
   it("允许合法 basename", () => {
