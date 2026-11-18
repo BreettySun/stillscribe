@@ -21,6 +21,27 @@ export interface RunOptions {
 }
 
 /**
+ * 不得传给外部 CLI 子进程的环境变量（铁律 #6）：模型服务 Key（表 / 单 Key / 旧名）与引擎接口令牌
+ * （子进程拿到令牌就能调设置路由）。yt-dlp、它拉起的 deno、ffmpeg/ffprobe 都用不到它们。
+ */
+const CHILD_ENV_DENYLIST = [
+  "STILLSCRIBE_AI_KEYS",
+  "STILLSCRIBE_AI_API_KEY",
+  "STILLSCRIBE_GEMINI_API_KEY",
+  "STILLSCRIBE_TOKEN",
+] as const;
+
+/**
+ * 外部 CLI 子进程用的环境：父进程环境去掉 CHILD_ENV_DENYLIST，返回新对象、不改入参。
+ * 不从 process.env 里删这些变量——AIConfig 之后还会从 process.env 读（queue.ts / run.ts）。
+ */
+export function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = { ...env };
+  for (const k of CHILD_ENV_DENYLIST) delete out[k];
+  return out;
+}
+
+/**
  * 运行命令。args[0] 必须是可执行文件的绝对路径（见 cli/tools.ts）。
  * 退出码非 0 抛出 Error（含 stderr 尾部 20 行）。
  */
@@ -34,7 +55,7 @@ export function runCmd(args: string[], opts: RunOptions = {}): Promise<RunResult
   process.stderr.write(`$ ${args.join(" ")}\n`);
 
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, rest, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(cmd, rest, { stdio: ["ignore", "pipe", "pipe"], env: childEnv(process.env) });
     let stdout = "";
     let stderr = "";
     let timer: NodeJS.Timeout | undefined;

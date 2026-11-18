@@ -22,6 +22,7 @@ import {
 	session,
 	shell,
 } from "electron";
+import { childEnv } from "@engine/cli/shell";
 import { filterYouTube } from "@engine/modules/cookies-filter";
 import { normalizeBaseUrl, withKey, type AIKeyTable } from "@shared/ai";
 import { loadKeyTable, saveKeyTable } from "./aiKeys";
@@ -71,6 +72,8 @@ function runYtDlp(args: string[]): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(ytDlpPath(), args, {
 			stdio: ["ignore", "ignore", "pipe"],
+			// 不把模型服务 Key / 引擎令牌带给 yt-dlp 及其拉起的 deno（铁律 #6）。
+			env: childEnv(process.env),
 		});
 		let stderr = "";
 		child.stderr.on("data", (d) => (stderr += d.toString()));
