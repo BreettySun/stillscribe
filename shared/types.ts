@@ -32,8 +32,17 @@ export type VideoQuality = 1080 | 1440;
 /** 文章生成模式。auto=调 Gemini API；semi=网页版人工粘贴回填。 */
 export type ArticleMode = "auto" | "semi";
 
-/** Gemini 模型 ID（可配置，速度/质量/价格权衡，见 AI 集成文档第 5/8 节）。保留为字符串以便随 SDK 迭代加档。 */
-export type GeminiModel = string;
+/** 模型 ID（可配置，速度/质量/价格权衡）。各模型服务的 ID 不同，故保留为字符串。 */
+export type AIModel = string;
+
+/** @deprecated 改用 AIModel；Task 11 删除。 */
+export type GeminiModel = AIModel;
+
+/** 结构化输出方式：json_schema（严格）> json_object（仅保证 JSON）> none（靠提示词约束）。 */
+export type AIStructuredMode = "json_schema" | "json_object" | "none";
+
+/** 当前模型服务地址所用 Key 的来源：界面保存 / 环境变量 / 无。 */
+export type AIKeySource = "saved" | "env" | "none";
 
 /**
  * 全自动(M7)喂图策略：
@@ -41,6 +50,29 @@ export type GeminiModel = string;
  * - "frames"：发去重后的代表单帧（模型看单帧更清楚，但帧多时图数/体积暴涨，成本高，见 AI 集成文档 §7/§8）。
  */
 export type AIImageSource = "frames" | "grids";
+
+/** 保存模型服务设置的增量补丁（均可选）。 */
+export interface AISettingsPatch {
+	baseUrl?: string;
+	model?: string;
+	imageSource?: AIImageSource;
+}
+
+/** 更新某个服务地址对应的 Key；apiKey 为 null 表示清除。 */
+export interface AIKeyUpdate {
+	baseUrl: string;
+	apiKey: string | null;
+}
+
+/** 「测试连接」结果。 */
+export interface AITestResult {
+	ok: boolean;
+	/** 模型是否能看懂图片；第一步就失败时为 null。 */
+	seesImage: boolean | null;
+	structuredMode: AIStructuredMode | null;
+	latencyMs: number;
+	error?: string;
+}
 
 /**
  * 下载时取哪个浏览器的 cookie（yt-dlp --cookies-from-browser）。
@@ -193,6 +225,8 @@ export interface Task {
 	outputs?: ExportOutputs;
 	/** 失败时的错误说明。 */
 	error?: string;
+	/** 全自动生成失败（已降级人工回填）的原因；成功得到文章后清空。 */
+	autoError?: string;
 	createdAt: ISODateTime;
 	updatedAt: ISODateTime;
 }

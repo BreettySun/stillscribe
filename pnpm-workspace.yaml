@@ -1,4 +1,4 @@
-# 仓库根 workspace（CLAUDE.md §4.1）。shared/ 仅类型，无 package.json，靠各自 tsconfig 的 @shared/* 别名引用。
+# 仓库根 workspace（CLAUDE.md §4.1）。shared/ 为类型与少量无依赖的纯函数，无 package.json，靠各自 tsconfig 的 @shared/* 别名引用。
 packages:
   - engine
   - ui
