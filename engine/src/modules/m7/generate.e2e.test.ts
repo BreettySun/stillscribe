@@ -103,7 +103,9 @@ describe("generateArticle 端到端（stub client）", () => {
     expect(captured.input!.images[0]!.mimeType).toBe("image/jpeg");
   });
 
+  // 这两例用 grids（同步写入的宫格图），不依赖 beforeEach 里未 await 的 writeManifest。
   it("被取消（aborted）的错误不重试，原样抛出", async () => {
+    writeFileSync(path.join(td.grids, "grid_001.jpg"), "gridbytes");
     let calls = 0;
     const aborted = new AIRequestError("aborted", "已取消");
     const client: ArticleClient = {
@@ -113,12 +115,13 @@ describe("generateArticle 端到端（stub client）", () => {
       },
     };
     await expect(
-      generateArticle({ taskDir: td, videoTitle: "Test Video", imageSource: "frames", client, retries: 2 }),
+      generateArticle({ taskDir: td, videoTitle: "Test Video", imageSource: "grids", client, retries: 2 }),
     ).rejects.toBe(aborted);
     expect(calls).toBe(1);
   });
 
   it("其他错误仍按 retries 重试", async () => {
+    writeFileSync(path.join(td.grids, "grid_001.jpg"), "gridbytes");
     let calls = 0;
     const client: ArticleClient = {
       async generateArticle() {
@@ -127,7 +130,7 @@ describe("generateArticle 端到端（stub client）", () => {
       },
     };
     await expect(
-      generateArticle({ taskDir: td, videoTitle: "Test Video", imageSource: "frames", client, retries: 2 }),
+      generateArticle({ taskDir: td, videoTitle: "Test Video", imageSource: "grids", client, retries: 2 }),
     ).rejects.toThrow(/重试 2 次/);
     expect(calls).toBe(3);
   });
