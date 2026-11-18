@@ -10,7 +10,12 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     // @engine 让主进程复用引擎的纯函数（如 cookie 过滤），esbuild 打包，无原生依赖。
-    resolve: { alias: { "@engine": resolve(__dirname, "../engine/src") } },
+    resolve: {
+      alias: {
+        "@engine": resolve(__dirname, "../engine/src"),
+        "@shared": resolve(__dirname, "../shared"),
+      },
+    },
     build: { rollupOptions: { input: resolve(__dirname, "src/main/index.ts") } },
   },
   preload: {

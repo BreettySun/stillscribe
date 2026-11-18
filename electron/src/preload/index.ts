@@ -23,4 +23,7 @@ contextBridge.exposeInMainWorld("stillscribe", {
 	/** 从浏览器刷新 youtube cookie（主进程读钥匙串），返回写入条数。 */
 	refreshCookies: (browser: string): Promise<{ kept: number }> =>
 		ipcRenderer.invoke("stillscribe:refresh-cookies", browser),
+	/** 保存（字符串）或清除（null）某模型服务地址的 Key；persisted 表示是否已加密落盘。 */
+	setAIKey: (baseUrl: string, apiKey: string | null): Promise<{ persisted: boolean }> =>
+		ipcRenderer.invoke("stillscribe:set-ai-key", baseUrl, apiKey),
 });

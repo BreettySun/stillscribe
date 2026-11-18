@@ -23,7 +23,8 @@ import {
 	shell,
 } from "electron";
 import { filterYouTube } from "@engine/modules/cookies-filter";
-import { resolveGeminiKey } from "./apiKey";
+import { normalizeBaseUrl, withKey, type AIKeyTable } from "@shared/ai";
+import { loadKeyTable, saveKeyTable } from "./aiKeys";
 
 // 运行时 __dirname = electron/out/main → 上溯三级到仓库根。
 const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -149,8 +150,8 @@ let enginePort = 0;
 let quitting = false;
 let restarts = 0;
 const MAX_RESTARTS = 5;
-// 打包后注入引擎的 Gemini Key（safeStorage 解密，app ready 后解析一次；重启复用）。dev 下为 undefined。
-let geminiKey: string | undefined;
+// 模型服务 Key 表（规范化 Base URL → Key；safeStorage 解密，app ready 后加载；引擎重启时取当前值）。
+let aiKeys: AIKeyTable = {};
 
 /** 让系统分配一个空闲端口（避免与单独运行的引擎 8787 冲突）。 */
 function getFreePort(): Promise<number> {
@@ -183,8 +184,8 @@ function startEngine(workRoot: string): void {
 		STILLSCRIBE_FFMPEG: path.join(bin, "ffmpeg"),
 		STILLSCRIBE_FFPROBE: path.join(bin, "ffprobe"),
 		STILLSCRIBE_DENO: path.join(bin, "deno"),
-		// 打包后 M7 全自动用的 Gemini Key（safeStorage 解密）；dev 下 undefined，引擎自读 engine/.env。
-		...(geminiKey ? { STILLSCRIBE_GEMINI_API_KEY: geminiKey } : {}),
+		// 模型服务 Key 表（safeStorage 解密后经 env 注入；Key 不写日志）。
+		STILLSCRIBE_AI_KEYS: JSON.stringify(aiKeys),
 	};
 
 	if (app.isPackaged) {
@@ -314,14 +315,47 @@ ipcMain.handle("stillscribe:refresh-cookies", (_e, browser: unknown) =>
 	refreshCookies(typeof browser === "string" && browser ? browser : "chrome"),
 );
 
+// 保存/清除某个模型服务地址的 Key：更新内存表 → 加密落盘 → 同步给运行中的引擎。Key 不写日志、不进错误信息。
+ipcMain.handle(
+	"stillscribe:set-ai-key",
+	async (_e, baseUrl: unknown, apiKey: unknown): Promise<{ persisted: boolean }> => {
+		if (typeof baseUrl !== "string") throw new Error("baseUrl 必须是字符串");
+		const norm = normalizeBaseUrl(baseUrl);
+		if (!norm.ok) throw new Error(norm.error);
+		let key: string | null;
+		if (apiKey === null) key = null;
+		else if (typeof apiKey === "string" && apiKey.trim()) key = apiKey.trim();
+		else throw new Error("apiKey 必须是非空字符串，或用 null 清除");
+
+		aiKeys = withKey(aiKeys, norm.baseUrl, key);
+		const persisted = saveKeyTable(aiKeys);
+
+		let status = 0;
+		try {
+			const r = await fetch(`http://127.0.0.1:${enginePort}/settings/ai/key`, {
+				method: "PUT",
+				headers: { Authorization: engineAuthHeader, "Content-Type": "application/json" },
+				body: JSON.stringify({ baseUrl: norm.baseUrl, apiKey: key }),
+			});
+			status = r.status;
+		} catch {
+			throw new Error("无法连接引擎，Key 已保存，重启后生效");
+		}
+		if (status < 200 || status >= 300) {
+			throw new Error(`引擎拒绝更新 Key（HTTP ${status}），重启后生效`);
+		}
+		return { persisted };
+	},
+);
+
 app.whenReady().then(async () => {
 	// 开发期 Dock 图标（打包后由 electron-builder 的 build/icon.icns 接管，P4）。
 	if (process.platform === "darwin" && !app.isPackaged) {
 		app.dock?.setIcon(path.join(REPO_ROOT, "build", "icon.png"));
 	}
 
-	// safeStorage 须 app ready 后用：解析一次 Key，spawn 引擎时经 env 注入（打包后才有；dev 为 undefined）。
-	geminiKey = resolveGeminiKey();
+	// safeStorage 须 app ready 后用：加载 Key 表（并迁移旧 gemini-key 文件），spawn 引擎时经 env 注入。
+	aiKeys = loadKeyTable();
 
 	enginePort = await getFreePort();
 	const origin = `http://127.0.0.1:${enginePort}`;
